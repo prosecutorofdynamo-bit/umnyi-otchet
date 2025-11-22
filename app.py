@@ -12,6 +12,33 @@ st.set_page_config(
     layout="wide",
 )
 
+# 🎨 Красивый фон и оформление карточек
+st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%);
+    }
+    .report-card {
+        padding: 1.2rem 1.5rem;
+        margin-bottom: 1rem;
+        border-radius: 0.8rem;
+        background-color: #ffffffcc;
+        border: 1px solid #d6e4ff;
+    }
+    .report-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1f4e79;
+        margin-bottom: 0.2rem;
+    }
+    .report-caption {
+        font-size: 14px;
+        color: #4a637e;
+        margin-bottom: 1rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Главный заголовок
 st.title("📊 Умный отчет")
 st.caption("Создание отчёта по проходам за пару кликов")
@@ -195,4 +222,5 @@ else:
                 file_name="умный_табель.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
 
