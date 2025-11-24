@@ -5,30 +5,35 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report  # берём функцию из engine.py
 
-# Настройки страницы
+# ================= НАСТРОЙКИ СТРАНИЦЫ =================
 st.set_page_config(
     page_title="Умный отчет",
     page_icon="📊",
     layout="wide",
+    initial_sidebar_state="auto",
 )
 
-# 🎨 Красивый фон и оформление карточек
-st.markdown("""
+# 🎨 Глобальное оформление (фон, шрифты, загрузчики файлов)
+st.markdown(
+    """
     <style>
-    /* Общие настройки текста во всём приложении */
+    /* Общие настройки текста и фона */
     html, body, .stApp {
-        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%);
-        color: #102A43;              /* тёмный читаемый текст */
-        font-size: 16px;             /* базовый размер шрифта */
+        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
+        color: #102A43 !important;
+        font-size: 16px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    /* Контейнер с контентом — чуть крупнее текст */
+    /* Основной контейнер с контентом */
     .block-container {
         font-size: 16px;
+        max-width: 1200px;
+        padding-top: 1rem;
+        padding-bottom: 2rem;
     }
 
-    /* Карточки отчёта */
+    /* Карточки отчёта (если будем использовать) */
     .report-card {
         padding: 1.2rem 1.5rem;
         margin-bottom: 1rem;
@@ -50,15 +55,64 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
-    /* Заголовки Streamlit делаем ярче и жирнее */
+    /* Заголовки делаем ярче и жирнее */
     h1, h2, h3, h4 {
         color: #102A43 !important;
-        font-weight: 700;
+        font-weight: 700 !important;
+    }
+
+    /* Более светлый и аккуратный вид загрузчика файлов */
+    .stFileUploader > div:nth-child(1) {
+        background-color: #f5f7fb !important;
+        border-radius: 8px !important;
+        border: 1px solid #d0d7ea !important;
+    }
+
+    .stFileUploader label {
+        font-weight: 600 !important;
+    }
+
+    .stFileUploader div[role="button"] {
+        background-color: #ffffff !important;
+        border: 1px solid #d0d7ea !important;
+        color: #102A43 !important;
+    }
+
+    /* Кнопка "Обработать данные" и "Скачать" */
+    .stButton > button {
+        background-color: #1f4e79 !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 0.5rem 1.5rem !important;
+        font-weight: 600 !important;
+    }
+    .stButton > button:hover {
+        background-color: #163858 !important;
+        color: #ffffff !important;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-# --- Шаг 1: Загрузка файлов ---
+# ================= КРАСИВЫЙ ГЛАВНЫЙ ЗАГОЛОВОК =================
+st.markdown(
+    """
+    <div style="text-align: center; padding: 20px; background-color: #F0F4FF; border-radius: 10px; margin-bottom: 1.5rem;">
+        <h2 style="color: #003366; margin-bottom: 0.5rem;">
+            📊 Умный контроль рабочего времени
+        </h2>
+        <p style="color: #003366; font-size:16px; margin: 0;">
+            Загрузите журнал проходов и (по желанию) файл кадров — система автоматически сформирует табель,
+            рассчитает недоработки, выходы, длительные отсутствия и причины прогула.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ================= ШАГ 1. ЗАГРУЗКА ФАЙЛОВ =================
 st.header("Шаг 1. Загрузка файлов")
 
 col_left, col_right = st.columns([2, 1])
@@ -70,7 +124,7 @@ with col_left:
     file_journal = st.file_uploader(
         "Файл журнала проходов",
         type=["xls", "xlsx"],
-        help="Формат: .xls или .xlsx. Убедитесь, что файл содержит таблицу проходов."
+        help="Формат: .xls или .xlsx. Убедитесь, что файл содержит таблицу проходов.",
     )
 
     st.markdown("---")
@@ -84,7 +138,7 @@ with col_left:
     file_kadry = st.file_uploader(
         "Файл кадров / отсутствий",
         type=["xls", "xlsx"],
-        help="Формат: .xls или .xlsx. Используется для учёта отпусков, больничных и т.д."
+        help="Формат: .xls или .xlsx. Используется для учёта отпусков, больничных и т.д.",
     )
 
 with col_right:
@@ -94,16 +148,16 @@ with col_right:
         - Журнал — стандартная выгрузка из системы проходов.
         - Кадровый файл — со столбцами:
           *«Сотрудник», «Вид отсутствия», «с», «до»*.
-        - Можно загрузить только журнал —
+        - Можно загрузить только журнал —  
           тогда «Причина отсутствия» останется пустой.
         """
     )
 
-# --- Подсказки и Шаг 2/3 только если загружен журнал ---
+# ================= ШАГ 2/3 – ТОЛЬКО ЕСЛИ ЕСТЬ ЖУРНАЛ =================
 if file_journal is None:
     st.warning("⬆ Сначала загрузите файл журнала проходов.")
 else:
-    # Кадровый файл не обязателен
+    # Информация о загруженных файлах
     if file_kadry is None:
         st.info(
             "Кадровый файл *не обязателен*. "
@@ -119,19 +173,19 @@ else:
     else:
         st.markdown("**📗 Файл кадров:** не загружен")
 
-    # --- Шаг 2: Обработка данных ---
+    # ---------- Шаг 2. Обработка данных ----------
     st.header("Шаг 2. Обработка данных")
 
     if st.button("🚀 Обработать данные"):
         try:
-            # file_kadry может быть None — это нормально (движок должен это учитывать)
+            # file_kadry может быть None — это нормально
             final_df = build_report(file_journal, file_kadry)
         except Exception as e:
             st.error(f"❌ Ошибка при обработке данных: {e}")
         else:
             st.success("✅ Обработка завершена.")
 
-            # --- Шаг 3. Предпросмотр результата ---
+            # ---------- Шаг 3. Предпросмотр и выгрузка ----------
             st.header("Шаг 3. Предпросмотр и выгрузка отчёта")
 
             # Определяем, есть ли смысл показывать «Причина отсутствия»
@@ -169,20 +223,22 @@ else:
             else:
                 final_view = final_df[visible_cols].copy()
 
-            # Красивее сортируем: сначала по ФИО, потом по дате (если есть)
+            # Сортировка: сначала по ФИО, потом по дате
             if "ФИО" in final_view.columns and "Дата" in final_view.columns:
                 final_view = final_view.sort_values(["ФИО", "Дата"])
 
             st.write(f"Строк в итоговой таблице: **{len(final_view)}**")
             st.dataframe(final_view.head(200))
 
-            # --- Подготовка Excel-файла с оформлением ---
+            # ---------- Подготовка Excel-файла с оформлением ----------
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
                 sheet_name = "Журнал"
 
-                # пишем таблицу с отступом (чтобы сверху уместить заголовок)
-                final_view.to_excel(writer, index=False, sheet_name=sheet_name, startrow=3)
+                # Пишем таблицу с отступом (чтобы сверху уместить заголовок)
+                final_view.to_excel(
+                    writer, index=False, sheet_name=sheet_name, startrow=3
+                )
 
                 wb = writer.book
                 ws = writer.sheets[sheet_name]
@@ -190,19 +246,20 @@ else:
                 max_col = ws.max_column
                 last_col_letter = get_column_letter(max_col)
 
-                # --- Большой заголовок ---
+                # Большой заголовок
                 title_cell = ws["A1"]
                 title_cell.value = "ОТЧЁТ ЗА НЕДЕЛЮ"
                 title_cell.font = Font(name="Times New Roman", size=14, bold=True)
-                title_cell.alignment = Alignment(horizontal="center", vertical="center")
+                title_cell.alignment = Alignment(
+                    horizontal="center", vertical="center"
+                )
                 ws.merge_cells(f"A1:{last_col_letter}1")
 
-                # --- Шапка таблицы (строка 4) ---
+                # Шапка таблицы (строка 4)
                 header_row = 4
                 header_fill = PatternFill("solid", fgColor="DCE6F1")  # нежно-голубой фон
                 header_font = Font(name="Times New Roman", size=11, bold=True)
 
-                # заголовки
                 for col in range(1, max_col + 1):
                     cell = ws.cell(row=header_row, column=col)
                     cell.fill = header_fill
@@ -213,10 +270,10 @@ else:
                         wrap_text=True,
                     )
 
-                # --- Выравнивание данных и ширина столбцов ---
+                # Выравнивание данных и ширина столбцов
                 col_names = [cell.value for cell in ws[header_row]]
 
-                # выравниваем все ячейки в таблице по центру
+                # Выравниваем все ячейки в таблице по центру
                 for col_idx, name in enumerate(col_names, start=1):
                     align = Alignment(
                         horizontal="center",
@@ -259,15 +316,16 @@ else:
 
             buffer.seek(0)
 
-            # --- Кнопка скачивания ---
+            # ---------- Кнопка скачивания ----------
             st.download_button(
                 label="💾 Скачать итоговый отчёт (Excel)",
                 data=buffer,
                 file_name="умный_табель.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                mime=(
+                    "application/vnd.openxmlformats-"
+                    "officedocument.spreadsheetml.sheet"
+                ),
             )
-
-
 
 
 
