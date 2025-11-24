@@ -15,43 +15,48 @@ st.set_page_config(
 # 🎨 Красивый фон и оформление карточек
 st.markdown("""
     <style>
-    .stApp {
+    /* Общие настройки текста во всём приложении */
+    html, body, .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%);
+        color: #102A43;              /* тёмный читаемый текст */
+        font-size: 16px;             /* базовый размер шрифта */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+
+    /* Контейнер с контентом — чуть крупнее текст */
+    .block-container {
+        font-size: 16px;
+    }
+
+    /* Карточки отчёта */
     .report-card {
         padding: 1.2rem 1.5rem;
         margin-bottom: 1rem;
         border-radius: 0.8rem;
-        background-color: #ffffffcc;
+        background-color: #ffffffee;
         border: 1px solid #d6e4ff;
     }
+
     .report-title {
         font-size: 28px;
         font-weight: 700;
         color: #1f4e79;
         margin-bottom: 0.2rem;
     }
+
     .report-caption {
-        font-size: 14px;
+        font-size: 15px;
         color: #4a637e;
         margin-bottom: 1rem;
     }
+
+    /* Заголовки Streamlit делаем ярче и жирнее */
+    h1, h2, h3, h4 {
+        color: #102A43 !important;
+        font-weight: 700;
+    }
     </style>
 """, unsafe_allow_html=True)
-
-# 🎯 Заголовок и описание
-st.markdown(
-    """
-    <div style="text-align: center; padding: 15px; background-color: #F0F4FF; border-radius: 10px;">
-        <h2 style="color: #003366;">📊 Умный контроль рабочего времени</h2>
-        <p style="color: #003366; font-size:16px;">
-            Загрузите журнал проходов и (по желанию) файл кадров — система автоматически сформирует
-            табель, рассчитает недоработки, выходы, длительные отсутствия и причины прогула.
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 # --- Шаг 1: Загрузка файлов ---
 st.header("Шаг 1. Загрузка файлов")
@@ -261,6 +266,7 @@ else:
                 file_name="умный_табель.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
 
 
 
