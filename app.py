@@ -268,7 +268,7 @@ if final_df is None:
     st.stop()
 
 # ---------------- ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА ----------------
-st.header("Шаг 3. Предпросмотр и выгрузка отчёта")
+st.header("Шаг 3. Выгрузка отчёта")
 
 # Определяем, есть ли смысл показывать «Причина отсутствия»
 show_reason = False
@@ -398,6 +398,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
