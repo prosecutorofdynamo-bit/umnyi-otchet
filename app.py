@@ -27,64 +27,48 @@ st.markdown(
         padding-top: 1rem;
         padding-bottom: 2rem;
     }
+    /* === ЗАГРУЗЧИК ФАЙЛОВ (новая версия) === */
 
-    /* Светлый фон загрузчика + убираем тёмный фон, рамку и английский текст */
+    /* Светлый фон всей плашки загрузчика */
     [data-testid="stFileUploader"] section {
-    background-color: #f5f7fb !important;
-    border: none !important;
-    color: #102A43 !important;
+        background-color: #f5f7fb !important;
+        border: 1px solid #d0d7ea !important;
+        border-radius: 8px !important;
+        color: #102A43 !important;
     }
 
-    [data-testid="stFileUploader"] section div {
-    display: none !important; /* скрывает английский текст "Drag and drop..." */
-    }
-    
-    /* Прячем стандартный английский текст внутри загрузчика */
-    [data-testid="stFileUploader"] section div {
+    /* Скрываем только английские подсказки, но НЕ кнопку */
+    [data-testid="stFileDropzone"] span,
+    [data-testid="stFileUploaderInstructions"] {
         display: none !important;
     }
 
+    /* Заголовок (label) — пусть будет аккуратный, хотя мы его скрываем через label_visibility */
     .stFileUploader label {
         font-weight: 600 !important;
         color: #102A43 !important;
     }
 
-    .stFileUploader div[role="button"] {
-        background-color: #ffffff !important;
+    /* Красивая светлая кнопка "Browse files" */
+    [data-testid="stFileUploader"] button {
+        background-color: #eef3ff !important;
+        color: #003366 !important;
         border: 1px solid #d0d7ea !important;
-        color: #102A43 !important;
-    }
-
-    /* Название загруженного файла и размер — читабельные */
-    [data-testid="stFileUploaderFileName"] {
-        color: #102A43 !important;
+        border-radius: 6px !important;
+        padding: 6px 14px !important;
         font-weight: 600 !important;
+        box-shadow: none !important;
     }
-    [data-testid="stFileUploaderSize"] {
-        color: #4a637e !important;
-        font-weight: 500 !important;
-    }
-
-    /* Прячем английский текст внутри дропзоны, чтобы не мозолил глаза */
-    [data-testid="stFileDropzone"] span {
-        color: transparent !important;
-    }
-    /* Светлая стильная кнопка "Browse files" */
-.stFileUploader div[role="button"] {
-    background-color: #eef3ff !important;
-    color: #003366 !important;
-    border: 1px solid #d0d7ea !important;
-    border-radius: 6px !important;
-    padding: 6px 14px !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
+    [data-testid="stFileUploader"] button:hover {
+        background-color: #d6e4ff !important;
     }
 
-    /* Убираем чёрный фон вокруг кнопки */
-    .stFileUploader > div:nth-child(1) > div:nth-child(1) {
-    background-color: transparent !important;
+    /* Убираем чёрный прямоугольник вокруг кнопки */
+    [data-testid="stFileDropzone"] {
+        background-color: transparent !important;
+        border: none !important;
     }
-
+  
     /* === Кнопки (Обработать данные, Скачать отчёт) === */
     .stButton > button, .stDownloadButton > button {
         background-color: #1E88E5 !important;
@@ -416,6 +400,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
