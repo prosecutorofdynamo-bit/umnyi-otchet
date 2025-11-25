@@ -28,27 +28,20 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* === Загрузчик файлов: убираем чёрную полосу === */
-    /* Внешний дропзон */
-    .stFileUploader [data-testid="stFileUploaderDropzone"] {
+    /* === Загрузчик файлов === */
+    .stFileUploader > div:nth-child(1) {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
+    }
+    .stFileUploader label {
+        font-weight: 600 !important;
         color: #102A43 !important;
     }
-
-    /* Внутренняя кнопка "Browse files" */
-    .stFileUploader [data-testid="stFileUploaderDropzone"] div[role="button"] {
+    .stFileUploader div[role="button"] {
         background-color: #ffffff !important;
-        border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
         color: #102A43 !important;
-    }
-
-    /* Текст "Drag and drop file here" делаем светлым и спокойным */
-    .stFileUploader [data-testid="stFileUploaderDropzone"] span {
-        color: #556987 !important;
-        font-size: 0.9rem !important;
     }
 
     /* Название загруженного файла и размер — читабельные */
@@ -61,9 +54,20 @@ st.markdown(
         font-weight: 500 !important;
     }
 
+    /* Прячем стандартный английский текст в дропзоне */
+    .stFileUploader [data-testid="stFileUploaderDropzone"] span {
+        display: none !important;
+    }
+
+    /* Подсказка под загрузчиком (наш русский текст) */
+    .upload-hint {
+        font-size: 14px;
+        color: #556987;
+        margin-top: 4px;
+    }
+
     /* === Кнопки (Обработать данные, Скачать отчёт) === */
-    .stButton > button,
-    .stDownloadButton > button {
+    .stButton > button, .stDownloadButton > button {
         background-color: #1E88E5 !important;
         color: white !important;
         border-radius: 8px !important;
@@ -73,30 +77,29 @@ st.markdown(
         font-weight: 600 !important;
         transition: 0.3s ease-in-out;
     }
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
+    .stButton > button:hover, .stDownloadButton > button:hover {
         background-color: #1565C0 !important;
         transform: translateY(-1px);
     }
 
     /* === Таблица предпросмотра — белый фон === */
-    .stDataFrame {
+    [data-testid="stDataFrame"] {
         background-color: #ffffff !important;
         border-radius: 6px !important;
         padding: 0.4rem !important;
     }
-    .stDataFrame div[role="grid"] {
+    [data-testid="stDataFrame"] div[role="grid"] {
         background-color: #ffffff !important;
         color: #102A43 !important;
     }
 
-    /* Заголовки */
+    /* === Заголовки === */
     h1, h2, h3, h4 {
         color: #102A43 !important;
         font-weight: 700 !important;
     }
 
-    /* Наши «бейджики» с названиями файлов (Журнал: ..., Кадровый файл: ...) */
+    /* Текст с названием загруженных файлов (если используешь .file-label) */
     .file-label {
         padding: 4px 10px;
         margin: 4px 0;
@@ -143,6 +146,14 @@ with col_left:
         help="Формат: .xls или .xlsx. Убедитесь, что файл содержит таблицу проходов."
     )
 
+    # Наш русский текст вместо скрытого английского
+    st.markdown(
+        '<div class="upload-hint">'
+        'Перетащите файл журнала сюда или нажмите кнопку «Browse files».'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     st.markdown("---")
 
     st.subheader("📗 Сведения из кадров (по желанию)")
@@ -155,6 +166,13 @@ with col_left:
         "Файл кадров / отсутствий",
         type=["xls", "xlsx"],
         help="Формат: .xls или .xlsx. Используется для учёта отпусков, больничных и т.д."
+    )
+
+    st.markdown(
+        '<div class="upload-hint">'
+        'Перетащите кадровый файл сюда или нажмите кнопку «Browse files».'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
 with col_right:
@@ -354,6 +372,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
