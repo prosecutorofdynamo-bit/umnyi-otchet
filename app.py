@@ -12,33 +12,34 @@ st.set_page_config(
     layout="wide",
 )
 
-# 🎨 Глобальное оформление (принудительно светлое)
-st.markdown("""
+# 🎨 ГЛОБАЛЬНОЕ ОФОРМЛЕНИЕ (насильно светлое, без чёрных кнопок)
+st.markdown(
+    """
 <style>
 :root {
-    color-scheme: light;  /* просим браузер/Streamlit вести себя как в светлой теме */
+    color-scheme: light;
 }
 
-/* Главный фон приложения */
-html, body, [data-testid="stAppViewContainer"], .stApp {
+/* Общий фон */
+html, body, .stApp, [data-testid="stAppViewContainer"] {
     background: linear-gradient(135deg, #e8efff 0%, #ffffff 60%) !important;
     color: #102A43 !important;
     font-size: 16px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Верхняя панель Streamlit (убираем темный фон) */
+/* Убираем тёмный верхний бар */
 [data-testid="stHeader"] {
-    background: rgba(255, 255, 255, 0.0) !important;
+    background-color: rgba(255, 255, 255, 0) !important;
 }
 
-/* Сайдбар, если он появится */
+/* Сайдбар, если появится */
 [data-testid="stSidebar"] {
     background-color: #f3f5ff !important;
     color: #102A43 !important;
 }
 
-/* Контейнер с основным контентом */
+/* Основной контейнер */
 .block-container {
     font-size: 16px;
 }
@@ -49,27 +50,21 @@ h1, h2, h3, h4 {
     font-weight: 700 !important;
 }
 
-/* === Загрузчик файлов (dropzone) === */
+/* === ЗАГРУЗЧИК ФАЙЛОВ (dropzone) === */
 [data-testid="stFileUploadDropzone"] {
-    background-color: #f5f7fb !important;       /* светлый голубоватый фон */
+    background-color: #f5f7fb !important;       /* светлый фон */
     border-radius: 8px !important;
     border: 1px dashed #d0d7ea !important;
     color: #102A43 !important;
 }
 
-/* Текст "Drag and drop..." и подсказки */
+/* Подписи к загрузчику */
 .stFileUploader label {
     font-weight: 600 !important;
     color: #102A43 !important;
 }
 
-/* Название загруженного файла — обычный тёмный текст, без чёрного прямоугольника */
-[data-testid="stFileUploaderFileName"] {
-    color: #102A43 !important;
-    background: transparent !important;
-}
-
-/* Кнопка "Browse files" / "Выбрать файл" */
+/* Кнопка "Browse files / Выбрать файл" */
 .stFileUploader div[role="button"] {
     background-color: #ffffff !important;
     border: 1px solid #d0d7ea !important;
@@ -77,51 +72,73 @@ h1, h2, h3, h4 {
     border-radius: 6px !important;
 }
 
-/* === Обычные кнопки (в том числе "Обработать данные") === */
+/* Имя загруженного файла — без чёрного фона */
+[data-testid="stFileUploaderFileName"] {
+    color: #102A43 !important;
+    background-color: transparent !important;
+}
+
+/* Контейнер с выбранными файлами */
+[data-testid="stFileUploaderFileDetails"] {
+    background-color: transparent !important;
+}
+
+/* === КНОПКИ (в том числе "Обработать данные") === */
 .stButton > button {
-    background-color: #1E88E5 !important;   /* приятный синий */
-    color: white !important;
+    background-color: #1E88E5 !important;   /* синий */
+    color: #ffffff !important;
     border-radius: 8px !important;
     padding: 8px 20px !important;
     font-size: 16px !important;
     border: none !important;
+    box-shadow: none !important;
 }
 .stButton > button:hover {
     background-color: #1565C0 !important;
 }
 
-/* === Кнопка скачивания === */
-.stDownloadButton button {
+/* === КНОПКА СКАЧИВАНИЯ === */
+.stDownloadButton > button {
     background-color: #1E88E5 !important;
-    color: white !important;
+    color: #ffffff !important;
     border-radius: 8px !important;
     padding: 10px 22px !important;
     font-size: 16px !important;
     border: none !important;
+    box-shadow: none !important;
 }
-.stDownloadButton button:hover {
+.stDownloadButton > button:hover {
     background-color: #1565C0 !important;
 }
 
-/* === Предпросмотр таблицы (st.dataframe) — белый фон, читаемый текст === */
+/* === ПРЕДПРОСМОТР ТАБЛИЦЫ === */
 [data-testid="stDataFrame"] {
     background-color: #ffffff !important;
     border-radius: 8px !important;
-    padding: 0.25rem !important;
+    padding: 0.3rem !important;
 }
 
-/* Внутри самого грида тоже принудительно светлый фон и тёмный текст */
+/* Внутренний грид таблицы */
 [data-testid="stDataFrame"] div[role="grid"] {
     background-color: #ffffff !important;
     color: #102A43 !important;
 }
 
-/* Чуть уменьшенный шрифт в таблице для компактности */
+/* Табличный текст */
 [data-testid="stDataFrame"] table {
-    font-size: 14px;
+    background-color: #ffffff !important;
+    color: #102A43 !important;
+    font-size: 14px !important;
+}
+
+/* Убираем чёрные/тёмные фоны при наведении на строки */
+[data-testid="stDataFrame"] tbody tr:hover {
+    background-color: #f0f4ff !important;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ================= ГЛАВНЫЙ ЗАГОЛОВОК =================
 st.markdown(
@@ -149,7 +166,7 @@ with col_left:
     file_journal = st.file_uploader(
         "Файл журнала проходов",
         type=["xls", "xlsx"],
-        help="Формат: .xls или .xlsx"
+        help="Формат: .xls или .xlsx",
     )
 
     st.markdown("---")
@@ -158,7 +175,7 @@ with col_left:
     file_kadry = st.file_uploader(
         "Файл кадров / отсутствий",
         type=["xls", "xlsx"],
-        help="Можно не загружать — тогда столбец 'Причина отсутствия' будет пустым"
+        help="Можно не загружать — тогда столбец 'Причина отсутствия' будет пустым.",
     )
 
 with col_right:
@@ -172,15 +189,15 @@ with col_right:
         """
     )
 
-# --- Запуск обработки ---
+# --- Шаг 2: Проверка и запуск обработки ---
 if file_journal is None:
     st.warning("⬆ Сначала загрузите файл журнала проходов.")
 else:
-    st.markdown(f"📘 **Файл журнала:** {file_journal.name}")
-    if file_kadry:
-        st.markdown(f"📗 **Файл кадров:** {file_kadry.name}")
+    st.markdown(f"📘 **Файл журнала:** `{file_journal.name}`")
+    if file_kadry is not None:
+        st.markdown(f"📗 **Файл кадров:** `{file_kadry.name}`")
     else:
-        st.markdown("📗 **Файл кадров не загружен**")
+        st.markdown("📗 **Файл кадров:** не загружен")
 
     st.header("Шаг 2. Обработка данных")
 
@@ -195,7 +212,7 @@ else:
             # --- Шаг 3. Предпросмотр и выгрузка ---
             st.header("Шаг 3. Предпросмотр и выгрузка отчёта")
 
-            # Показывать ли «Причина отсутствия»
+            # Показываем ли «Причина отсутствия»
             show_reason = (
                 "Причина отсутствия" in final_df.columns
                 and final_df["Причина отсутствия"].astype(str).str.strip().ne("").any()
@@ -219,7 +236,10 @@ else:
                 visible_cols.append("Причина отсутствия")
 
             visible_cols = [c for c in visible_cols if c in final_df.columns]
-            final_view = final_df[visible_cols].copy()
+            if visible_cols:
+                final_view = final_df[visible_cols].copy()
+            else:
+                final_view = final_df.copy()
 
             if "ФИО" in final_view.columns and "Дата" in final_view.columns:
                 final_view = final_view.sort_values(["ФИО", "Дата"])
