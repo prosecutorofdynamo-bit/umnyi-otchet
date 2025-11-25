@@ -16,6 +16,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* Фон приложения и базовый текст */
     .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
         color: #102A43 !important;
@@ -28,23 +29,42 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* === Загрузчик файлов === */
+    /* === ЗАГРУЗЧИК ФАЙЛОВ (делаем светлым) === */
+
+    /* Внешний контейнер загрузчика */
     .stFileUploader > div:nth-child(1) {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
     }
+
+    /* Внутренняя зона, где написано Drag & drop */
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #f5f7fb !important;
+        border-radius: 8px !important;
+        border: 1px solid #d0d7ea !important;
+        color: #102A43 !important;
+    }
+
+    /* Текст внутри зоны (чтобы не был чёрно-зелёным) */
+    [data-testid="stFileUploaderDropzone"] * {
+        color: #102A43 !important;
+    }
+
+    /* Подпись над загрузчиком */
     .stFileUploader label {
         font-weight: 600 !important;
         color: #102A43 !important;
     }
+
+    /* Кнопка Browse files */
     .stFileUploader div[role="button"] {
         background-color: #ffffff !important;
         border: 1px solid #d0d7ea !important;
         color: #102A43 !important;
     }
 
-    /* Название загруженного файла и размер — читабельные */
+    /* Название загруженного файла и размер — читаемые */
     [data-testid="stFileUploaderFileName"] {
         color: #102A43 !important;
         font-weight: 600 !important;
@@ -54,20 +74,20 @@ st.markdown(
         font-weight: 500 !important;
     }
 
-    /* Прячем стандартный английский текст в дропзоне */
-    .stFileUploader [data-testid="stFileUploaderDropzone"] span {
-        display: none !important;
+    /* Текст "Журнал: файл.xlsx", "Кадровый файл: ..." */
+    .file-label {
+        padding: 4px 10px;
+        margin: 4px 0;
+        border-radius: 6px;
+        background-color: #eef3ff;
+        color: #003366;
+        font-weight: 600;
+        display: inline-block;
     }
 
-    /* Подсказка под загрузчиком (наш русский текст) */
-    .upload-hint {
-        font-size: 14px;
-        color: #556987;
-        margin-top: 4px;
-    }
-
-    /* === Кнопки (Обработать данные, Скачать отчёт) === */
-    .stButton > button, .stDownloadButton > button {
+    /* === КНОПКИ (Обработать данные, Скачать отчёт) === */
+    .stButton > button,
+    .stDownloadButton > button {
         background-color: #1E88E5 !important;
         color: white !important;
         border-radius: 8px !important;
@@ -77,37 +97,38 @@ st.markdown(
         font-weight: 600 !important;
         transition: 0.3s ease-in-out;
     }
-    .stButton > button:hover, .stDownloadButton > button:hover {
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
         background-color: #1565C0 !important;
         transform: translateY(-1px);
     }
 
-    /* === Таблица предпросмотра — белый фон === */
+    /* === ТАБЛИЦА ПРЕДПРОСМОТРА (делаем белой) === */
+
+    /* Контейнер с таблицей */
     [data-testid="stDataFrame"] {
         background-color: #ffffff !important;
-        border-radius: 6px !important;
+        color: #102A43 !important;
+        border-radius: 8px !important;
         padding: 0.4rem !important;
     }
-    [data-testid="stDataFrame"] div[role="grid"] {
+
+    /* Внутренние элементы грида */
+    [data-testid="stDataFrame"] div {
         background-color: #ffffff !important;
         color: #102A43 !important;
     }
 
-    /* === Заголовки === */
+    /* На всякий случай — таблицы внутри грида */
+    [data-testid="stDataFrame"] table {
+        background-color: #ffffff !important;
+        color: #102A43 !important;
+    }
+
+    /* === ЗАГОЛОВКИ === */
     h1, h2, h3, h4 {
         color: #102A43 !important;
         font-weight: 700 !important;
-    }
-
-    /* Текст с названием загруженных файлов (если используешь .file-label) */
-    .file-label {
-        padding: 4px 10px;
-        margin: 4px 0;
-        border-radius: 6px;
-        background-color: #eef3ff;
-        color: #003366;
-        font-weight: 600;
-        display: inline-block;
     }
     </style>
     """,
@@ -154,7 +175,7 @@ with col_left:
         unsafe_allow_html=True,
     )
 
-    st.markdown("---")
+        st.markdown("---")
 
     st.subheader("📗 Сведения из кадров (по желанию)")
     st.markdown(
@@ -167,6 +188,8 @@ with col_left:
         type=["xls", "xlsx"],
         help="Формат: .xls или .xlsx. Используется для учёта отпусков, больничных и т.д."
     )
+
+st.caption("Перетащите файл сюда или нажмите «Browse files» для выбора кадрового файла.")
 
     st.markdown(
         '<div class="upload-hint">'
@@ -191,6 +214,8 @@ with col_right:
 if file_journal is None:
     st.warning("⬆ Сначала загрузите файл журнала проходов.")
     st.stop()
+
+st.caption("Перетащите файл сюда или нажмите «Browse files» для выбора файла журнала.")
 
 # Пояснение по кадровому файлу
 if file_kadry is None:
@@ -372,6 +397,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
