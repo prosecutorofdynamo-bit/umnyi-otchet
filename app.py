@@ -16,7 +16,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Фон приложения и базовый текст */
     .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
         color: #102A43 !important;
@@ -29,42 +28,26 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* === ЗАГРУЗЧИК ФАЙЛОВ (делаем светлым) === */
-
-    /* Внешний контейнер загрузчика */
-    .stFileUploader > div:nth-child(1) {
+    /* === Загрузчик файлов: светлый фон, без чёрных полос === */
+    .stFileUploader > div:nth-child(1),
+    [data-testid="stFileDropzone"] {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
     }
 
-    /* Внутренняя зона, где написано Drag & drop */
-    [data-testid="stFileUploaderDropzone"] {
-        background-color: #f5f7fb !important;
-        border-radius: 8px !important;
-        border: 1px solid #d0d7ea !important;
-        color: #102A43 !important;
-    }
-
-    /* Текст внутри зоны (чтобы не был чёрно-зелёным) */
-    [data-testid="stFileUploaderDropzone"] * {
-        color: #102A43 !important;
-    }
-
-    /* Подпись над загрузчиком */
     .stFileUploader label {
         font-weight: 600 !important;
         color: #102A43 !important;
     }
 
-    /* Кнопка Browse files */
     .stFileUploader div[role="button"] {
         background-color: #ffffff !important;
         border: 1px solid #d0d7ea !important;
         color: #102A43 !important;
     }
 
-    /* Название загруженного файла и размер — читаемые */
+    /* Название загруженного файла и размер — читабельные */
     [data-testid="stFileUploaderFileName"] {
         color: #102A43 !important;
         font-weight: 600 !important;
@@ -74,7 +57,45 @@ st.markdown(
         font-weight: 500 !important;
     }
 
-    /* Текст "Журнал: файл.xlsx", "Кадровый файл: ..." */
+    /* Прячем английский текст внутри дропзоны, чтобы не мозолил глаза */
+    [data-testid="stFileDropzone"] span {
+        color: transparent !important;
+    }
+
+    /* === Кнопки (Обработать данные, Скачать отчёт) === */
+    .stButton > button, .stDownloadButton > button {
+        background-color: #1E88E5 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        padding: 10px 22px !important;
+        font-size: 16px !important;
+        border: none !important;
+        font-weight: 600 !important;
+        transition: 0.3s ease-in-out;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background-color: #1565C0 !important;
+        transform: translateY(-1px);
+    }
+
+    /* === Таблица предпросмотра — белый фон === */
+    .stDataFrame {
+        background-color: #ffffff !important;
+        border-radius: 6px !important;
+        padding: 0.4rem !important;
+    }
+    .stDataFrame div[role="grid"] {
+        background-color: #ffffff !important;
+        color: #102A43 !important;
+    }
+
+    /* Заголовки */
+    h1, h2, h3, h4 {
+        color: #102A43 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Текст "Журнал: файл.xlsx" и "Кадровый файл: ..." */
     .file-label {
         padding: 4px 10px;
         margin: 4px 0;
@@ -85,55 +106,11 @@ st.markdown(
         display: inline-block;
     }
 
-    /* === КНОПКИ (Обработать данные, Скачать отчёт) === */
-    .stButton > button,
-    .stDownloadButton > button {
-        background-color: #1E88E5 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        padding: 10px 22px !important;
-        font-size: 16px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        transition: 0.3s ease-in-out;
-    }
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        background-color: #1565C0 !important;
-        transform: translateY(-1px);
-    }
-
-    /* === ТАБЛИЦА ПРЕДПРОСМОТРА (делаем белой) === */
-
-    /* Контейнер с таблицей */
-    [data-testid="stDataFrame"] {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-        border-radius: 8px !important;
-        padding: 0.4rem !important;
-    }
-
-    /* Внутренние элементы грида */
-    [data-testid="stDataFrame"] div {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-    }
-
-    /* На всякий случай — таблицы внутри грида */
-    [data-testid="stDataFrame"] table {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-    }
-
-    /* === ЗАГОЛОВКИ === */
-    h1, h2, h3, h4 {
-        color: #102A43 !important;
-        font-weight: 700 !important;
-    }
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
+
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
@@ -305,9 +282,6 @@ else:
 if "ФИО" in final_view.columns and "Дата" in final_view.columns:
     final_view = final_view.sort_values(["ФИО", "Дата"])
 
-st.write(f"Строк в итоговой таблице: **{len(final_view)}**")
-st.dataframe(final_view.head(200), use_container_width=True)
-
 # ---------------- ФОРМИРОВАНИЕ И СКАЧИВАНИЕ EXCEL ----------------
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -397,6 +371,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
