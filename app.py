@@ -191,7 +191,7 @@ with col_left:
 
 st.caption("Перетащите файл сюда или нажмите «Browse files» для выбора кадрового файла.")
 
-    st.markdown(
+st.markdown(
         '<div class="upload-hint">'
         'Перетащите кадровый файл сюда или нажмите кнопку «Browse files».'
         '</div>',
@@ -397,6 +397,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
