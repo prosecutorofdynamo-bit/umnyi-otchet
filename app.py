@@ -16,24 +16,36 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Фон и базовый текст */
-    html, body, .stApp {
-        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%);
-        color: #102A43;
-        font-size: 16px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    ...
+    .stFileUploader > div:nth-child(1) {
+        background-color: #f5f7fb !important;
+        border-radius: 8px !important;
+        border: 1px solid #d0d7ea !important;
     }
-
-    .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-    }
-
-    /* Заголовки */
-    h1, h2, h3, h4 {
+    .stFileUploader label {
+        font-weight: 600 !important;
         color: #102A43 !important;
-        font-weight: 700 !important;
     }
+    .stFileUploader div[role="button"] {
+        background-color: #ffffff !important;
+        border: 1px solid #d0d7ea !important;
+        color: #102A43 !important;
+    }
+
+    /* Название загруженного файла и размер */
+    [data-testid="stFileUploaderFileName"] {
+        color: #102A43 !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stFileUploaderSize"] {
+        color: #4a637e !important;
+        font-weight: 500 !important;
+    }
+    ...
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
     /* Кнопки (в том числе "Обработать данные") */
     .stButton > button {
@@ -352,3 +364,4 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
