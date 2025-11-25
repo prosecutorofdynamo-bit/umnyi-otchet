@@ -69,38 +69,21 @@ st.markdown(
     [data-testid="stFileDropzone"] span {
         color: transparent !important;
     }
-   
-    /* --- Убираем чёрный фон у кнопки Browse files --- */
-    [data-testid="baseFileUploader"] button {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-        border: 1px solid #d0d7ea !important;
-        border-radius: 6px !important;
-        padding: 8px 14px !important;
-        font-size: 14px !important;
-    }
-    [data-testid="baseFileUploader"] button:hover {
-        background-color: #eef3ff !important;
-        color: #003366 !important;
-        border-color: #b3c7ff !important;
+    /* Светлая стильная кнопка "Browse files" */
+.stFileUploader div[role="button"] {
+    background-color: #eef3ff !important;
+    color: #003366 !important;
+    border: 1px solid #d0d7ea !important;
+    border-radius: 6px !important;
+    padding: 6px 14px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
     }
 
-    /* --- Убираем чёрный фон у кнопки Browse files --- */
-    [data-testid="baseFileUploader"] button {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-        border: 1px solid #d0d7ea !important;
-        border-radius: 6px !important;
-        padding: 8px 14px !important;
-        font-size: 14px !important;
+    /* Убираем чёрный фон вокруг кнопки */
+    .stFileUploader > div:nth-child(1) > div:nth-child(1) {
+    background-color: transparent !important;
     }
-    [data-testid="baseFileUploader"] button:hover {
-        background-color: #eef3ff !important;
-        color: #003366 !important;
-        border-color: #b3c7ff !important;
-    }
-
-    </style>
 
     /* === Кнопки (Обработать данные, Скачать отчёт) === */
     .stButton > button, .stDownloadButton > button {
@@ -433,6 +416,21 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
