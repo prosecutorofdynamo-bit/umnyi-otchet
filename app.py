@@ -30,10 +30,32 @@ html, body, .stApp {
     padding-bottom: 2rem;
 }
 
-/* Заголовки */
+/* Заголовки (на всякий случай) */
 h1, h2, h3, h4 {
     color: #102A43 !important;
     font-weight: 700 !important;
+}
+
+/* Плашки для шагов */
+.step-header {
+    background-color: #E3F2FD;
+    color: #0D47A1;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin: 1rem 0 0.5rem;
+    font-size: 18px;
+}
+
+/* Бейджи с именами файлов */
+.file-badge {
+    display: inline-block;
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #d0d7ea;
+    padding: 6px 12px;
+    margin-bottom: 6px;
+    font-size: 14px;
 }
 
 /* Кнопка скачивания */
@@ -66,7 +88,7 @@ h1, h2, h3, h4 {
     color: #102A43 !important;
 }
 
-/* Немного подправим таблицу (чтобы не было "чёрного ада") */
+/* Таблица — на светлом фоне */
 .stDataFrame iframe {
     background-color: #ffffff !important;
 }
@@ -92,7 +114,7 @@ st.markdown(
 )
 
 # ================= ШАГ 1. ЗАГРУЗКА ФАЙЛОВ =================
-st.header("Шаг 1. Загрузка файлов")
+st.markdown('<div class="step-header">Шаг 1. Загрузка файлов</div>', unsafe_allow_html=True)
 
 col_left, col_right = st.columns([2, 1])
 
@@ -132,42 +154,46 @@ with col_right:
         """
     )
 
-# Информация о загруженных файлах (без зелёного «кода» на чёрном фоне)
+# Информация о загруженных файлах
 if file_journal is None:
     st.warning("⬆ Сначала загрузите файл журнала проходов.")
 else:
-    st.markdown(f"📘 **Файл журнала:** **{file_journal.name}**")
+    st.markdown(
+        f'<div class="file-badge">📘 <strong>Файл журнала:</strong> {file_journal.name}</div>',
+        unsafe_allow_html=True,
+    )
     if file_kadry is not None:
-        st.markdown(f"📗 **Файл кадров:** **{file_kadry.name}**")
+        st.markdown(
+            f'<div class="file-badge">📗 <strong>Файл кадров:</strong> {file_kadry.name}</div>',
+            unsafe_allow_html=True,
+        )
     else:
-        st.markdown("📗 **Файл кадров:** не загружен")
-
+        st.markdown(
+            '<div class="file-badge">📗 <strong>Файл кадров:</strong> не загружен</div>',
+            unsafe_allow_html=True,
+        )
 
 # ================= ШАГ 2. ОБРАБОТКА ДАННЫХ =================
-st.header("Шаг 2. Обработка данных")
+st.markdown('<div class="step-header">Шаг 2. Обработка данных</div>', unsafe_allow_html=True)
 
-# Кнопка всегда видна, но внутри проверим, загружен ли журнал
 process_clicked = st.button("🚀 Обработать данные")
 
-final_df = None  # локальная переменная для результата
+final_df = None  # результат обработки
 
 if process_clicked:
     if file_journal is None:
         st.error("Сначала загрузите файл журнала проходов.")
     else:
         try:
-            # file_kadry может быть None — движок должен это учитывать
-            final_df = build_report(file_journal, file_kadry)
+            final_df = build_report(file_journal, file_kadry)  # file_kadry может быть None
         except Exception as e:
             st.error(f"❌ Ошибка при обработке данных: {e}")
         else:
             st.success("✅ Обработка завершена.")
 
-
 # ================= ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА =================
-st.header("Шаг 3. Предпросмотр и выгрузка отчёта")
+st.markdown('<div class="step-header">Шаг 3. Предпросмотр и выгрузка отчёта</div>', unsafe_allow_html=True)
 
-# Если только что нажали кнопку и всё прошло успешно — показываем результат
 if (process_clicked) and (final_df is not None):
 
     # --- Логика показа «Причина отсутствия» ---
@@ -301,4 +327,7 @@ if (process_clicked) and (final_df is not None):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 else:
-    st.info("После загрузки файлов нажмите кнопку **«🚀 Обработать данные»**, чтобы увидеть результат.")
+    st.info(
+        "После загрузки файлов нажмите кнопку **«🚀 Обработать данные»**, "
+        "чтобы сформировать и просмотреть отчёт."
+    )
