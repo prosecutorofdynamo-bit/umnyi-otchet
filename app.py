@@ -78,17 +78,6 @@ st.markdown(
         transform: translateY(-1px);
     }
 
-    /* === Таблица предпросмотра — белый фон === */
-    .stDataFrame {
-        background-color: #ffffff !important;
-        border-radius: 6px !important;
-        padding: 0.4rem !important;
-    }
-    .stDataFrame div[role="grid"] {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-    }
-
     /* Заголовки */
     h1, h2, h3, h4 {
         color: #102A43 !important;
@@ -106,11 +95,21 @@ st.markdown(
         display: inline-block;
     }
 
+    [data-testid="stDataFrame"] div[role="grid"] {
+    background-color: #ffffff !important;
+    color: #102A43 !important;
+    }
+    
+    /* — Полностью скрываем англ. подсказку внутри загрузчика файлов — */
+    [data-testid="stFileDropzone"] span,
+    [data-testid="stFileUploaderInstructions"] {
+    display: none !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
@@ -371,6 +370,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
