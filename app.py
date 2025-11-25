@@ -28,20 +28,27 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* === Загрузчик файлов === */
-    .stFileUploader > div:nth-child(1) {
+    /* === Загрузчик файлов: убираем чёрную полосу === */
+    /* Внешний дропзон */
+    .stFileUploader [data-testid="stFileUploaderDropzone"] {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
-    }
-    .stFileUploader label {
-        font-weight: 600 !important;
         color: #102A43 !important;
     }
-    .stFileUploader div[role="button"] {
+
+    /* Внутренняя кнопка "Browse files" */
+    .stFileUploader [data-testid="stFileUploaderDropzone"] div[role="button"] {
         background-color: #ffffff !important;
+        border-radius: 8px !important;
         border: 1px solid #d0d7ea !important;
         color: #102A43 !important;
+    }
+
+    /* Текст "Drag and drop file here" делаем светлым и спокойным */
+    .stFileUploader [data-testid="stFileUploaderDropzone"] span {
+        color: #556987 !important;
+        font-size: 0.9rem !important;
     }
 
     /* Название загруженного файла и размер — читабельные */
@@ -55,7 +62,8 @@ st.markdown(
     }
 
     /* === Кнопки (Обработать данные, Скачать отчёт) === */
-    .stButton > button, .stDownloadButton > button {
+    .stButton > button,
+    .stDownloadButton > button {
         background-color: #1E88E5 !important;
         color: white !important;
         border-radius: 8px !important;
@@ -65,12 +73,13 @@ st.markdown(
         font-weight: 600 !important;
         transition: 0.3s ease-in-out;
     }
-    .stButton > button:hover, .stDownloadButton > button:hover {
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
         background-color: #1565C0 !important;
         transform: translateY(-1px);
     }
 
-    /* === Таблица предпросмотра === */
+    /* === Таблица предпросмотра — белый фон === */
     .stDataFrame {
         background-color: #ffffff !important;
         border-radius: 6px !important;
@@ -81,13 +90,13 @@ st.markdown(
         color: #102A43 !important;
     }
 
-    /* === Заголовки === */
+    /* Заголовки */
     h1, h2, h3, h4 {
         color: #102A43 !important;
         font-weight: 700 !important;
     }
 
-    /* Текст с названием загруженных файлов */
+    /* Наши «бейджики» с названиями файлов (Журнал: ..., Кадровый файл: ...) */
     .file-label {
         padding: 4px 10px;
         margin: 4px 0;
@@ -97,12 +106,10 @@ st.markdown(
         font-weight: 600;
         display: inline-block;
     }
-
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
-
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
@@ -347,6 +354,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
