@@ -15,6 +15,17 @@ st.set_page_config(
 # ---------------- ГЛОБАЛЬНЫЙ СТИЛЬ (CSS) ----------------
 st.markdown(
     """
+    /* === Красивое отображение названия загруженного файла и размера === */
+   [data-testid="stFileUploaderFileName"],
+    [data-testid="stFileUploaderSize"] {
+    color: #003366 !important;
+    background-color: #eef3ff !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+    }
+    
     <style>
     .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
@@ -400,6 +411,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
