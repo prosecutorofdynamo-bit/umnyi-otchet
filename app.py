@@ -193,13 +193,11 @@ with col_right:
 if file_journal is None:
     st.warning("⬆ Сначала загрузите файл журнала проходов.")
 else:
-    st.markdown(f"📘 **Файл журнала:** `{file_journal.name}`")
+    st.markdown(f"📘 **Файл журнала:** **{file_journal.name}**")
     if file_kadry is not None:
-        st.markdown(f"📗 **Файл кадров:** `{file_kadry.name}`")
+        st.markdown(f"📗 **Файл кадров:** **{file_kadry.name}**")
     else:
         st.markdown("📗 **Файл кадров:** не загружен")
-
-    st.header("Шаг 2. Обработка данных")
 
     if st.button("🚀 Обработать данные"):
         try:
@@ -329,3 +327,4 @@ else:
                 file_name="умный_табель.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
