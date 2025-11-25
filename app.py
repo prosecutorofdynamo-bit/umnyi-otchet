@@ -16,7 +16,21 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    ...
+    .stApp {
+        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
+        color: #102A43 !important;
+        font-size: 16px !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+
+    /* Контейнер */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 2rem;
+        font-size: 16px;
+    }
+
+    /* Улучшенный вид загрузчика файлов */
     .stFileUploader > div:nth-child(1) {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
@@ -32,7 +46,7 @@ st.markdown(
         color: #102A43 !important;
     }
 
-    /* Название загруженного файла и размер */
+    /* Название загруженного файла и размер — ЧИТАЕМЫЕ */
     [data-testid="stFileUploaderFileName"] {
         color: #102A43 !important;
         font-weight: 600 !important;
@@ -41,12 +55,31 @@ st.markdown(
         color: #4a637e !important;
         font-weight: 500 !important;
     }
-    ...
+
+    /* Стили для кнопки "Обработать данные" и "Скачать отчёт" */
+    .stButton > button, .stDownloadButton > button {
+        background-color: #1E88E5 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        font-size: 16px !important;
+        border: none !important;
+        transition: background-color 0.3s ease-in-out;
+    }
+
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background-color: #1565C0 !important;
+    }
+
+    /* Заголовки — выразительные и читаемые */
+    h1, h2, h3, h4 {
+        color: #102A43 !important;
+        font-weight: 700 !important;
+    }
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
-
     /* Кнопки (в том числе "Обработать данные") */
     .stButton > button {
         background-color: #1E88E5 !important;
@@ -364,4 +397,5 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
