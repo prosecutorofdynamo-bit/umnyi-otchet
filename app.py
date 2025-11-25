@@ -175,7 +175,7 @@ with col_left:
         unsafe_allow_html=True,
     )
 
-        st.markdown("---")
+    st.markdown("---")
 
     st.subheader("📗 Сведения из кадров (по желанию)")
     st.markdown(
@@ -397,6 +397,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
