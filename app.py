@@ -28,12 +28,15 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* === Загрузчик файлов: светлый фон, без чёрных полос === */
-    .stFileUploader > div:nth-child(1),
-    [data-testid="stFileDropzone"] {
-        background-color: #f5f7fb !important;
-        border-radius: 8px !important;
-        border: 1px solid #d0d7ea !important;
+    /* Светлый фон загрузчика + убираем тёмный фон, рамку и английский текст */
+    [data-testid="stFileUploader"] section {
+    background-color: #f5f7fb !important;
+    border: none !important;
+    color: #102A43 !important;
+    }
+
+    [data-testid="stFileUploader"] section div {
+    display: none !important; /* скрывает английский текст "Drag and drop..." */
     }
     
     /* Прячем стандартный английский текст внутри загрузчика */
@@ -398,6 +401,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
