@@ -148,9 +148,12 @@ else:
     if file_kadry is None:
         st.info("Кадровый файл не загружен — причина отсутствия останется пустой.")
 
-    st.markdown(f"📘 **Журнал:** `{file_journal.name}`")
-    if file_kadry:
-        st.markdown(f"📗 **Кадровый файл:** `{file_kadry.name}`")
+    st.markdown(f"<div style='color:#003366; font-weight:600;'>📘 Журнал: {file_journal.name}</div>", unsafe_allow_html=True)
+
+if file_kadry is not None:
+    st.markdown(f"<div style='color:#003366; font-weight:600;'>📗 Кадровый файл: {file_kadry.name}</div>", unsafe_allow_html=True)
+else:
+    st.markdown("<div style='color:#555;'>📗 Кадровый файл: не загружен</div>", unsafe_allow_html=True)
 
     st.header("Шаг 2. Обработка данных")
 
@@ -211,3 +214,4 @@ else:
                 file_name="умный_табель.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
