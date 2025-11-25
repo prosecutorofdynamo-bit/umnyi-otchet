@@ -23,14 +23,12 @@ st.markdown(
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
     }
 
-    /* Контейнер */
     .block-container {
         padding-top: 1rem;
         padding-bottom: 2rem;
-        font-size: 16px;
     }
 
-    /* Улучшенный вид загрузчика файлов */
+    /* === Загрузчик файлов === */
     .stFileUploader > div:nth-child(1) {
         background-color: #f5f7fb !important;
         border-radius: 8px !important;
@@ -46,7 +44,7 @@ st.markdown(
         color: #102A43 !important;
     }
 
-    /* Название загруженного файла и размер — ЧИТАЕМЫЕ */
+    /* Название загруженного файла и размер — читабельные */
     [data-testid="stFileUploaderFileName"] {
         color: #102A43 !important;
         font-weight: 600 !important;
@@ -56,82 +54,43 @@ st.markdown(
         font-weight: 500 !important;
     }
 
-    /* Стили для кнопки "Обработать данные" и "Скачать отчёт" */
+    /* === Кнопки (Обработать данные, Скачать отчёт) === */
     .stButton > button, .stDownloadButton > button {
         background-color: #1E88E5 !important;
         color: white !important;
         border-radius: 8px !important;
-        padding: 10px 20px !important;
+        padding: 10px 22px !important;
         font-size: 16px !important;
         border: none !important;
-        transition: background-color 0.3s ease-in-out;
+        font-weight: 600 !important;
+        transition: 0.3s ease-in-out;
     }
-
     .stButton > button:hover, .stDownloadButton > button:hover {
         background-color: #1565C0 !important;
+        transform: translateY(-1px);
     }
 
-    /* Заголовки — выразительные и читаемые */
+    /* === Таблица предпросмотра === */
+    .stDataFrame {
+        background-color: #ffffff !important;
+        border-radius: 6px !important;
+        padding: 0.4rem !important;
+    }
+    .stDataFrame div[role="grid"] {
+        background-color: #ffffff !important;
+        color: #102A43 !important;
+    }
+
+    /* === Заголовки === */
     h1, h2, h3, h4 {
         color: #102A43 !important;
         font-weight: 700 !important;
     }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-    /* Кнопки (в том числе "Обработать данные") */
-    .stButton > button {
-        background-color: #1E88E5 !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-        padding: 0.5rem 1.4rem !important;
-        font-size: 16px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        transition: 0.2s ease-in-out;
-    }
-    .stButton > button:hover {
-        background-color: #1565C0 !important;
-        transform: translateY(-1px);
-    }
 
-    /* Кнопка скачивания отчёта */
-    .stDownloadButton button {
-        background-color: #1E88E5 !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-        padding: 0.5rem 1.4rem !important;
-        font-size: 16px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        transition: 0.2s ease-in-out;
-    }
-    .stDownloadButton button:hover {
-        background-color: #1565C0 !important;
-        transform: translateY(-1px);
-    }
-
-    /* Загрузчики файлов — светлый фон, без чёрно-зелёного */
-    .stFileUploader > div:nth-child(1) {
-        background-color: #f5f7fb !important;
-        border-radius: 8px !important;
-        border: 1px solid #d0d7ea !important;
-    }
-    .stFileUploader label {
-        font-weight: 600 !important;
-        color: #102A43 !important;
-    }
-    .stFileUploader div[role="button"] {
-        background-color: #ffffff !important;
-        border: 1px solid #d0d7ea !important;
-        color: #102A43 !important;
-    }
-
-    /* Текст "Журнал: файл.xlsx" и "Кадровый файл: ..." */
+    /* Текст с названием загруженных файлов */
     .file-label {
         padding: 4px 10px;
-        margin: 2px 0 4px 0;
+        margin: 4px 0;
         border-radius: 6px;
         background-color: #eef3ff;
         color: #003366;
@@ -139,20 +98,11 @@ st.markdown(
         display: inline-block;
     }
 
-    /* Таблица предпросмотра — светлый фон */
-    .stDataFrame {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        padding: 0.3rem !important;
-    }
-    .stDataFrame div[role="grid"] {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-    }
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
+
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
@@ -397,5 +347,6 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
