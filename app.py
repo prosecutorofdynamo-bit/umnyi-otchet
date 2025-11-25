@@ -12,17 +12,33 @@ st.set_page_config(
     layout="wide",
 )
 
-# 🎨 Красивое оформление
+# 🎨 Глобальное оформление (принудительно светлое)
 st.markdown("""
 <style>
-/* Фон приложения */
-html, body, .stApp {
-    background: linear-gradient(135deg, #e8efff 0%, #ffffff 60%);
-    color: #102A43 !important;
-    font-size: 16px;
+:root {
+    color-scheme: light;  /* просим браузер/Streamlit вести себя как в светлой теме */
 }
 
-/* Контейнер с контентом */
+/* Главный фон приложения */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background: linear-gradient(135deg, #e8efff 0%, #ffffff 60%) !important;
+    color: #102A43 !important;
+    font-size: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Верхняя панель Streamlit (убираем темный фон) */
+[data-testid="stHeader"] {
+    background: rgba(255, 255, 255, 0.0) !important;
+}
+
+/* Сайдбар, если он появится */
+[data-testid="stSidebar"] {
+    background-color: #f3f5ff !important;
+    color: #102A43 !important;
+}
+
+/* Контейнер с основным контентом */
 .block-container {
     font-size: 16px;
 }
@@ -33,28 +49,45 @@ h1, h2, h3, h4 {
     font-weight: 700 !important;
 }
 
-/* === Загрузчик файлов === */
+/* === Загрузчик файлов (dropzone) === */
 [data-testid="stFileUploadDropzone"] {
-    background-color: #f5f7fb !important;
+    background-color: #f5f7fb !important;       /* светлый голубоватый фон */
     border-radius: 8px !important;
     border: 1px dashed #d0d7ea !important;
     color: #102A43 !important;
 }
 
+/* Текст "Drag and drop..." и подсказки */
 .stFileUploader label {
     font-weight: 600 !important;
     color: #102A43 !important;
 }
 
+/* Название загруженного файла — обычный тёмный текст, без чёрного прямоугольника */
 [data-testid="stFileUploaderFileName"] {
     color: #102A43 !important;
     background: transparent !important;
 }
 
+/* Кнопка "Browse files" / "Выбрать файл" */
 .stFileUploader div[role="button"] {
     background-color: #ffffff !important;
     border: 1px solid #d0d7ea !important;
     color: #102A43 !important;
+    border-radius: 6px !important;
+}
+
+/* === Обычные кнопки (в том числе "Обработать данные") === */
+.stButton > button {
+    background-color: #1E88E5 !important;   /* приятный синий */
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 8px 20px !important;
+    font-size: 16px !important;
+    border: none !important;
+}
+.stButton > button:hover {
+    background-color: #1565C0 !important;
 }
 
 /* === Кнопка скачивания === */
@@ -70,7 +103,20 @@ h1, h2, h3, h4 {
     background-color: #1565C0 !important;
 }
 
-/* Таблица — выравнивание */
+/* === Предпросмотр таблицы (st.dataframe) — белый фон, читаемый текст === */
+[data-testid="stDataFrame"] {
+    background-color: #ffffff !important;
+    border-radius: 8px !important;
+    padding: 0.25rem !important;
+}
+
+/* Внутри самого грида тоже принудительно светлый фон и тёмный текст */
+[data-testid="stDataFrame"] div[role="grid"] {
+    background-color: #ffffff !important;
+    color: #102A43 !important;
+}
+
+/* Чуть уменьшенный шрифт в таблице для компактности */
 [data-testid="stDataFrame"] table {
     font-size: 14px;
 }
@@ -146,25 +192,33 @@ else:
         else:
             st.success("✅ Обработка завершена.")
 
-            # --- Шаг 3. Предпросмотр ---
+            # --- Шаг 3. Предпросмотр и выгрузка ---
             st.header("Шаг 3. Предпросмотр и выгрузка отчёта")
 
+            # Показывать ли «Причина отсутствия»
             show_reason = (
                 "Причина отсутствия" in final_df.columns
                 and final_df["Причина отсутствия"].astype(str).str.strip().ne("").any()
             )
 
             visible_cols = [
-                "ФИО", "Дата", "Время прихода", "Время ухода",
-                "Опоздание", "Общее время", "Вне офиса", "Выходы",
+                "ФИО",
+                "Дата",
+                "Время прихода",
+                "Время ухода",
+                "Опоздание",
+                "Общее время",
+                "Вне офиса",
+                "Выходы",
                 "Отсутствие более 2 часов подряд",
-                "Итого за день", "Итого за неделю", "Недоработки",
+                "Итого за день",
+                "Итого за неделю",
+                "Недоработки",
             ]
             if show_reason:
                 visible_cols.append("Причина отсутствия")
 
             visible_cols = [c for c in visible_cols if c in final_df.columns]
-
             final_view = final_df[visible_cols].copy()
 
             if "ФИО" in final_view.columns and "Дата" in final_view.columns:
@@ -190,7 +244,7 @@ else:
                 title_cell.alignment = Alignment(horizontal="center", vertical="center")
                 ws.merge_cells(f"A1:{last_col_letter}1")
 
-                # Оформление шапки
+                # Шапка таблицы
                 header_row = 4
                 header_fill = PatternFill("solid", fgColor="DCE6F1")
                 header_font = Font(name="Times New Roman", size=11, bold=True)
@@ -199,22 +253,40 @@ else:
                     cell = ws.cell(row=header_row, column=col)
                     cell.fill = header_fill
                     cell.font = header_font
-                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    cell.alignment = Alignment(
+                        horizontal="center",
+                        vertical="center",
+                        wrap_text=True,
+                    )
 
                 col_names = [cell.value for cell in ws[header_row]]
+
+                # Центровка данных
                 for col_idx, name in enumerate(col_names, start=1):
-                    align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    align = Alignment(
+                        horizontal="center",
+                        vertical="center",
+                        wrap_text=True,
+                    )
                     for row in range(header_row + 1, ws.max_row + 1):
                         ws.cell(row=row, column=col_idx).alignment = align
 
                 # Ширины колонок
                 width_map = {
-                    "ФИО": 30, "Дата": 12, "Время прихода": 15, "Время ухода": 15,
-                    "Опоздание": 14, "Вне офиса": 16, "Выходы": 12,
+                    "ФИО": 30,
+                    "Дата": 12,
+                    "Время прихода": 15,
+                    "Время ухода": 15,
+                    "Опоздание": 14,
+                    "Вне офиса": 16,
+                    "Выходы": 12,
                     "Отсутствие более 2 часов подряд": 28,
-                    "Итого за день": 14, "Итого за неделю": 16,
-                    "Недоработки": 16, "Причина отсутствия": 28,
+                    "Итого за день": 14,
+                    "Итого за неделю": 16,
+                    "Недоработки": 16,
+                    "Причина отсутствия": 28,
                 }
+
                 for col_idx, name in enumerate(col_names, start=1):
                     if name in width_map:
                         ws.column_dimensions[get_column_letter(col_idx)].width = width_map[name]
@@ -237,8 +309,3 @@ else:
                 file_name="умный_табель.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-
-
-
-
-
