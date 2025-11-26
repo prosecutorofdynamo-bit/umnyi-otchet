@@ -581,8 +581,8 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         out_df["Дата_key"] = pd.to_datetime(out_df["Дата"]).dt.date
         kadry_dates["Дата_key"] = kadry_dates["Дата"]
 
-        out_df["ФИО_key"] = out_df["ФИО"].astype(str).str.strip().str.lower()
-        kadry_dates["ФИО_key"] = kadry_dates["ФИО"].astype(str).str.strip().str.lower()
+        out_df["ФИО_key"] = out_df["ФИО"].map(fio_norm)
+        kadry_dates["ФИО_key"] = kadry_dates["ФИО"].map(fio_norm)
 
         # соединяем
         final = out_df.merge(
@@ -617,6 +617,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
