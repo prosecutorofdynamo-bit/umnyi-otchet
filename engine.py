@@ -5,6 +5,7 @@ import re
 
 from datetime import datetime, date
 
+# === Умный парсер дат ===
 def smart_parse_date(x):
     """
     Аккуратный разбор дат:
@@ -34,8 +35,8 @@ def smart_parse_date(x):
     if not s or s.lower() in {"nan", "none", "nat"}:
         return pd.NaT
 
-    # немного чистим
-    s_clean = re.sub(r"[-/]", ".", s)  # 21-11-24 → 21.11.24; 2024/11/21 → 2024.11.21
+    # немного чистим: 21-11-24 → 21.11.24; 2024/11/21 → 2024.11.21
+    s_clean = re.sub(r"[-/]", ".", s)
 
     # Несколько популярных форматов
     for fmt in ("%d.%m.%Y", "%d.%m.%y", "%Y.%m.%d"):
@@ -49,6 +50,7 @@ def smart_parse_date(x):
         return pd.to_datetime(s, dayfirst=True, errors="coerce")
     except Exception:
         return pd.NaT
+
 
 # === Константы ===
 OUTSIDE = "шлюз"
@@ -106,7 +108,7 @@ def inside_minutes_between(
     if grp is None or grp.empty or a >= b:
         return 0
 
-    g = grp.sort_values("Дата события")[[ "Дата события", right_col ]].copy()
+    g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
     g["dest_n"] = g[right_col].map(norm)
 
     start_look = a - pd.Timedelta(hours=6)
@@ -161,7 +163,7 @@ def longest_outside_gap_between(
     if grp is None or grp.empty or a >= b:
         return 0, None, None
 
-    g = grp.sort_values("Дата события")[[ "Дата события", right_col ]].copy()
+    g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
     g["dest_n"] = g[right_col].map(norm)
 
     start_look = a - pd.Timedelta(hours=6)
@@ -316,6 +318,8 @@ def is_nonperson(fio: str) -> bool:
     return False
 
 
+# ===================== ЧТЕНИЕ ЖУРНАЛА =====================
+
 def read_journal(file_obj) -> pd.DataFrame:
     """
     Читаем журнал проходов из Excel.
@@ -360,7 +364,8 @@ def read_journal(file_obj) -> pd.DataFrame:
         .str.strip()
     )
 
-    df['Дата события'] = df['Дата события'].apply(smart_parse_date)
+    # умный разбор даты
+    df["Дата события"] = df["Дата события"].apply(smart_parse_date)
     df = df.dropna(subset=["Дата события"]).sort_values("Дата события")
     df["Рабочий_день"] = df["Дата события"].apply(work_day)
 
@@ -376,6 +381,8 @@ def read_journal(file_obj) -> pd.DataFrame:
 
     return df
 
+
+# ===================== ЧТЕНИЕ КАДРОВОГО ФАЙЛА =====================
 
 def read_kadry(file_obj) -> pd.DataFrame:
     """
@@ -411,10 +418,11 @@ def read_kadry(file_obj) -> pd.DataFrame:
     kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
     kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
 
-    for col in ['Дата_с', 'Дата_по']:
+    # умный разбор дат
+    for col in ["Дата_с", "Дата_по"]:
         kadry[col] = kadry[col].apply(smart_parse_date)
 
-    kadry['Дата_по'] = kadry['Дата_по'].fillna(kadry['Дата_с'])
+    kadry["Дата_по"] = kadry["Дата_по"].fillna(kadry["Дата_с"])
 
     rows = []
     for _, r in kadry.iterrows():
@@ -435,7 +443,6 @@ def read_kadry(file_obj) -> pd.DataFrame:
 
 
 # --- Доп. логика: опоздания, выходы, флаг "возможен проход вне терминала" ---
-
 
 def _core_window_for_day(day):
     base = pd.Timestamp(day).normalize()
@@ -495,7 +502,7 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
         base = pd.Timestamp(day).normalize()
         a_core, b_core = _core_window_for_day(base)
 
-        g = grp.sort_values("Дата события")[[ "Дата события", right_col ]].copy()
+        g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
         g["dest_n"] = g[right_col].map(norm)
 
         # только события в ядре
@@ -548,6 +555,17 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
     return pd.DataFrame(rows)
 
 
+# === Ключ для сопоставления ФИО (журнал ↔ кадры) ===
+def fio_match_key(s):
+    s = "" if pd.isna(s) else str(s)
+    s = unicodedata.normalize("NFKC", s)         # нормализуем символы и пробелы
+    s = s.replace("ё", "е").replace("Ё", "Е")   # убираем различие Ё/Е
+    s = re.sub(r"\s+", " ", s)                  # множественные пробелы → один
+    return s.strip().lower()                    # обрезаем края, в нижний регистр
+
+
+# ===================== ГЛАВНАЯ ФУНКЦИЯ ОТЧЁТА =====================
+
 def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     Главная функция: получает файл журнала и, при наличии, кадровый файл.
@@ -577,21 +595,13 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         # читаем кадровый файл
         kadry_dates = read_kadry(kadry_file)
 
-        # Нормализация ФИО для более точного сопоставления
-    def fio_match_key(s):
-        s = "" if pd.isna(s) else str(s)
-        s = unicodedata.normalize("NFKC", s)  # нормализуем символы и пробелы
-        s = s.replace("ё", "е").replace("Ё", "Е")  # убираем различие Ё/Е
-        s = re.sub(r"\s+", " ", s)  # заменяем множественные пробелы на один
-        return s.strip().lower()  # убираем пробелы по краям, приводим к нижнему регистру
+        # создаём ключи ФИО (журнал и кадры) через fio_match_key
+        out_df["ФИО_key"] = out_df["ФИО"].apply(fio_match_key)
+        kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
 
-    # Создание ключей из ФИО
-    out_df["ФИО_key"] = out_df["ФИО"].apply(fio_match_key)
-    kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
-
-    # Создание ключей для дат (убираем ошибки формата)
-    out_df["Дата_key"] = pd.to_datetime(out_df["Дата"], errors="coerce").dt.date
-    kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
+        # ключи по дате
+        out_df["Дата_key"] = pd.to_datetime(out_df["Дата"], errors="coerce").dt.date
+        kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
 
         # соединяем
         final = out_df.merge(
@@ -608,7 +618,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     # форматируем дату дд-мм-гггг
     final["Дата"] = pd.to_datetime(final["Дата"], errors="coerce").dt.strftime("%d-%m-%Y")
 
-    # порядок колонок
+    # порядок колонок (лишние — заполним пустыми)
     cols_order = [
         "ФИО",
         "Дата",
@@ -626,8 +636,3 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
-
-
-
-
-
