@@ -3,6 +3,53 @@ import io
 import unicodedata
 import re
 
+from datetime import datetime, date
+
+def smart_parse_date(x):
+    """
+    Аккуратный разбор дат:
+    - если уже Timestamp/датa → просто приводим к pandas
+    - если Excel-число → пытаемся трактовать как серию Excel
+    - если строка → пробуем несколько форматов и общий to_datetime(dayfirst=True)
+    - при неуспехе → NaT
+    """
+    # Уже Timestamp или date
+    if isinstance(x, (pd.Timestamp, datetime, date)):
+        return pd.to_datetime(x, errors="coerce")
+
+    # Пустое / NaN / None
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return pd.NaT
+
+    # Excel-сериал (целое или float)
+    if isinstance(x, (int, float)):
+        try:
+            # стандартный Excel origin
+            return pd.to_datetime(x, origin="1899-12-30", unit="D")
+        except Exception:
+            return pd.NaT
+
+    # Остальное считаем строкой
+    s = str(x).strip()
+    if not s or s.lower() in {"nan", "none", "nat"}:
+        return pd.NaT
+
+    # немного чистим
+    s_clean = re.sub(r"[-/]", ".", s)  # 21-11-24 → 21.11.24; 2024/11/21 → 2024.11.21
+
+    # Несколько популярных форматов
+    for fmt in ("%d.%m.%Y", "%d.%m.%y", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(s_clean, fmt)
+        except ValueError:
+            pass
+
+    # Общий резервный вариант: пусть pandas попробует
+    try:
+        return pd.to_datetime(s, dayfirst=True, errors="coerce")
+    except Exception:
+        return pd.NaT
+
 # === Константы ===
 OUTSIDE = "шлюз"
 INSIDE_HINT = "офис"
@@ -313,7 +360,7 @@ def read_journal(file_obj) -> pd.DataFrame:
         .str.strip()
     )
 
-    df["Дата события"] = pd.to_datetime(df["Дата события"], errors="coerce")
+    df['Дата события'] = df['Дата события'].apply(smart_parse_date)
     df = df.dropna(subset=["Дата события"]).sort_values("Дата события")
     df["Рабочий_день"] = df["Дата события"].apply(work_day)
 
@@ -364,13 +411,10 @@ def read_kadry(file_obj) -> pd.DataFrame:
     kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
     kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
 
-    for col in ["Дата_с", "Дата_по"]:
-        kadry[col] = kadry[col].astype(str).str.extract(
-            r"(\d{2}\.\d{2}\.\d{4})", expand=False
-        )
-        kadry[col] = pd.to_datetime(kadry[col], dayfirst=True, errors="coerce")
+    for col in ['Дата_с', 'Дата_по']:
+        kadry[col] = kadry[col].apply(smart_parse_date)
 
-    kadry["Дата_по"] = kadry["Дата_по"].fillna(kadry["Дата_с"])
+    kadry['Дата_по'] = kadry['Дата_по'].fillna(kadry['Дата_с'])
 
     rows = []
     for _, r in kadry.iterrows():
@@ -573,5 +617,6 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
