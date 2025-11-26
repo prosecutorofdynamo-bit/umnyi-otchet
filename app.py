@@ -15,17 +15,6 @@ st.set_page_config(
 # ---------------- ГЛОБАЛЬНЫЙ СТИЛЬ (CSS) ----------------
 st.markdown(
     """
-    /* === Красивое отображение названия загруженного файла и размера === */
-   [data-testid="stFileUploaderFileName"],
-    [data-testid="stFileUploaderSize"] {
-    color: #003366 !important;
-    background-color: #eef3ff !important;
-    padding: 6px 12px !important;
-    border-radius: 6px !important;
-    font-weight: 600 !important;
-    display: inline-block !important;
-    }
-    
     <style>
     .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
@@ -38,7 +27,8 @@ st.markdown(
         padding-top: 1rem;
         padding-bottom: 2rem;
     }
-    /* === ЗАГРУЗЧИК ФАЙЛОВ (новая версия) === */
+
+    /* === ЗАГРУЗЧИК ФАЙЛОВ === */
 
     /* Светлый фон всей плашки загрузчика */
     [data-testid="stFileUploader"] section {
@@ -48,19 +38,13 @@ st.markdown(
         color: #102A43 !important;
     }
 
-    /* Скрываем только английские подсказки, но НЕ кнопку */
+    /* Скрываем английские подсказки */
     [data-testid="stFileDropzone"] span,
     [data-testid="stFileUploaderInstructions"] {
         display: none !important;
     }
 
-    /* Заголовок (label) — пусть будет аккуратный, хотя мы его скрываем через label_visibility */
-    .stFileUploader label {
-        font-weight: 600 !important;
-        color: #102A43 !important;
-    }
-
-    /* Красивая светлая кнопка "Browse files" */
+    /* Кнопка "Browse files" — светлая */
     [data-testid="stFileUploader"] button {
         background-color: #eef3ff !important;
         color: #003366 !important;
@@ -74,13 +58,31 @@ st.markdown(
         background-color: #d6e4ff !important;
     }
 
-    /* Убираем чёрный прямоугольник вокруг кнопки */
+    /* Убираем тёмный блок вокруг кнопки */
     [data-testid="stFileDropzone"] {
         background-color: transparent !important;
         border: none !important;
     }
-  
-    /* === Кнопки (Обработать данные, Скачать отчёт) === */
+
+    /* Название файла и размер — читаемые, с отдельным фоном */
+    [data-testid="stFileUploaderFileName"] {
+        color: #003366 !important;
+        background-color: #ffffff !important;
+        padding: 4px 8px !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        display: inline-block !important;
+    }
+    [data-testid="stFileUploaderSize"] {
+        color: #4a637e !important;
+        background-color: #ffffff !important;
+        padding: 2px 6px !important;
+        border-radius: 4px !important;
+        margin-left: 4px !important;
+        font-size: 13px !important;
+    }
+
+    /* Кнопки (Обработать данные, Скачать отчёт) */
     .stButton > button, .stDownloadButton > button {
         background-color: #1E88E5 !important;
         color: white !important;
@@ -113,17 +115,11 @@ st.markdown(
         display: inline-block;
     }
 
+    /* Таблица предпросмотра (если появится) — белый фон */
     [data-testid="stDataFrame"] div[role="grid"] {
-    background-color: #ffffff !important;
-    color: #102A43 !important;
+        background-color: #ffffff !important;
+        color: #102A43 !important;
     }
-    
-    /* — Полностью скрываем англ. подсказку внутри загрузчика файлов — */
-    [data-testid="stFileDropzone"] span,
-    [data-testid="stFileUploaderInstructions"] {
-    display: none !important;
-    }
-
     </style>
     """,
     unsafe_allow_html=True
@@ -411,6 +407,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
