@@ -577,12 +577,21 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         # читаем кадровый файл
         kadry_dates = read_kadry(kadry_file)
 
-        # подготавливаем ключи для склейки
-        out_df["Дата_key"] = pd.to_datetime(out_df["Дата"]).dt.date
-        kadry_dates["Дата_key"] = kadry_dates["Дата"]
+        # Нормализация ФИО для более точного сопоставления
+    def fio_match_key(s):
+        s = "" if pd.isna(s) else str(s)
+        s = unicodedata.normalize("NFKC", s)  # нормализуем символы и пробелы
+        s = s.replace("ё", "е").replace("Ё", "Е")  # убираем различие Ё/Е
+        s = re.sub(r"\s+", " ", s)  # заменяем множественные пробелы на один
+        return s.strip().lower()  # убираем пробелы по краям, приводим к нижнему регистру
 
-        out_df["ФИО_key"] = out_df["ФИО"].map(fio_norm)
-        kadry_dates["ФИО_key"] = kadry_dates["ФИО"].map(fio_norm)
+    # Создание ключей из ФИО
+    out_df["ФИО_key"] = out_df["ФИО"].apply(fio_match_key)
+    kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
+
+    # Создание ключей для дат (убираем ошибки формата)
+    out_df["Дата_key"] = pd.to_datetime(out_df["Дата"], errors="coerce").dt.date
+    kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
 
         # соединяем
         final = out_df.merge(
@@ -617,6 +626,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
