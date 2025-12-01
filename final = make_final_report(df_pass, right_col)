@@ -1,9 +1,88 @@
 import streamlit as st
 import pandas as pd
 import io  # для формирования файла Excel в памяти
+import unicodedata  # ← ДОБАВЬ ЭТО
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report  # берём функцию из engine.py
+
+def fio_norm(s: str) -> str:
+    s = "" if pd.isna(s) else str(s)
+    s = unicodedata.normalize("NFKC", s)
+    s = s.replace("ё", "е").replace("Ё", "Е")
+    s = " ".join(s.strip().split()).lower()
+    return s
+
+def build_kadry_dates_from_df(kadry: pd.DataFrame) -> pd.DataFrame:
+    """
+    Принимает сырую таблицу кадров (как из Excel),
+    возвращает kadry_dates: ФИО, Дата (date), Тип (строка).
+    Логика идентична Колабу.
+    """
+
+    # 1) Ищем строку, где в ЛЮБОЙ колонке есть "Сотрудник"
+    def _is_sotr_cell(x):
+        s = "" if pd.isna(x) else str(x)
+        return s.strip().casefold() == "сотрудник"
+
+    mask_rows = kadry.apply(lambda row: row.map(_is_sotr_cell).any(), axis=1)
+    idxs = kadry.index[mask_rows]
+
+    if len(idxs) == 0:
+        raise RuntimeError(
+            "Не удалось найти строку с заголовком 'Сотрудник' "
+            "(поиск по всем колонкам, без учёта регистра). "
+            "Проверьте, что в кадровом отчёте есть колонка 'Сотрудник'."
+        )
+
+    hdr_row = idxs[0]
+
+    # 2) Берём эту строку как шапку
+    kadry = kadry.copy()
+    kadry.columns = kadry.iloc[hdr_row]
+    kadry = kadry.iloc[hdr_row + 1 :]  # ниже заголовка
+
+    # 3) Оставляем нужные колонки
+    kadry = kadry.rename(
+        columns={
+            "Сотрудник": "ФИО",
+            "Вид отсутствия": "Тип",
+            "с": "Дата_с",
+            "до": "Дата_по",
+        }
+    )
+
+    need_cols = ["ФИО", "Тип", "Дата_с", "Дата_по"]
+    kadry = kadry[need_cols].copy()
+    kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
+
+    # 4) Вытаскиваем даты формата дд.мм.гггг
+    for col in ["Дата_с", "Дата_по"]:
+        kadry[col] = kadry[col].astype(str).str.extract(
+            r"(\d{2}\.\d{2}\.\d{4})", expand=False
+        )
+        kadry[col] = pd.to_datetime(kadry[col], dayfirst=True, errors="coerce")
+
+    # Если "до" пусто — отсутствие один день
+    kadry["Дата_по"] = kadry["Дата_по"].fillna(kadry["Дата_с"])
+
+    # 5) Разворачиваем интервалы в посуточный список
+    rows = []
+    for _, r in kadry.iterrows():
+        d1, d2 = r["Дата_с"], r["Дата_по"]
+        if pd.isna(d1) or pd.isna(d2):
+            continue
+        for d in pd.date_range(d1, d2, freq="D"):
+            rows.append({"ФИО": r["ФИО"], "Дата": d.date(), "Тип": r["Тип"]})
+
+    kadry_dates = pd.DataFrame(rows)
+
+    # 6) Замена типа отсутствия (как в Колабе)
+    kadry_dates["Тип"] = kadry_dates["Тип"].replace(
+        to_replace=r"(?i).*гос.*обязан.*", value="Сдача крови", regex=True
+    )
+
+    return kadry_dates
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -203,12 +282,13 @@ with col_left:
         unsafe_allow_html=True,
     )
 
-    file_kadry = st.file_uploader(
-        "Файл кадров / отсутствий",
-        type=["xls", "xlsx"],
-        label_visibility="collapsed",  # скрыть стандартный label
-        help="Кадровый файл с отсутствиями сотрудников (XLS/XLSX)."
-    )
+    kadry_file = st.file_uploader("Загрузите файл кадров (.xls / .xlsx)", type=["xls", "xlsx"])
+
+kadry_dates = None
+if kadry_file is not None:
+    raw_kadry_df = pd.read_excel(kadry_file, header=None)
+    kadry_dates = build_kadry_dates_from_df(raw_kadry_df)
+    st.write(f"Загружено записей по отсутствиям: {len(kadry_dates)}")
 
 with col_right:
     st.markdown(
@@ -231,7 +311,7 @@ if file_journal is None:
 st.caption("Перетащите файл сюда или нажмите «Browse files» для выбора файла журнала.")
 
 # Пояснение по кадровому файлу
-if file_kadry is None:
+if kadry_file is None:
     st.info(
         "Кадровый файл *не обязателен*. "
         "Можете загрузить его для указания причин отсутствия "
@@ -245,7 +325,7 @@ st.markdown(
     f"<div class='file-label'>📘 Журнал: {file_journal.name}</div>",
     unsafe_allow_html=True,
 )
-if file_kadry is not None:
+if kadry_file is None:
     st.markdown(
         f"<div class='file-label'>📗 Кадровый файл: {file_kadry.name}</div>",
         unsafe_allow_html=True,
@@ -407,6 +487,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
