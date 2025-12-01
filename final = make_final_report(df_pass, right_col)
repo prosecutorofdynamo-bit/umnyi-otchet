@@ -325,9 +325,10 @@ st.markdown(
     f"<div class='file-label'>📘 Журнал: {file_journal.name}</div>",
     unsafe_allow_html=True,
 )
-if kadry_file is None:
+
+if kadry_file is not None:
     st.markdown(
-        f"<div class='file-label'>📗 Кадровый файл: {file_kadry.name}</div>",
+        f"<div class='file-label'>📗 Кадровый файл: {kadry_file.name}</div>",
         unsafe_allow_html=True,
     )
 else:
@@ -345,8 +346,8 @@ final_df = None
 
 if st.button("🚀 Обработать данные"):
     try:
-        # file_kadry может быть None — это нормально
-        final_df = build_report(file_journal, file_kadry)
+        # kadry_file может быть None — это нормально
+        final_df = build_report(file_journal, kadry_file)
     except Exception as e:
         st.error(f"❌ Ошибка при обработке данных: {e}")
     else:
@@ -487,6 +488,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
