@@ -206,20 +206,22 @@ st.markdown(
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
-    """
-    <div style="text-align: center; padding: 20px; background-color: #F0F4FF;
-                border-radius: 10px; margin-bottom: 1.5rem;">
-        <h2 style="color: #003366; margin-bottom: 0.5rem;">
-            📊 Умный контроль рабочего времени
-        </h2>
-        <p style="color: #003366; font-size:16px; margin: 0;">
-            Загрузите журнал проходов и (по желанию) файл кадров — система автоматически сформирует табель,
-            рассчитает недоработки, выходы, длительные отсутствия и причины прогула.
-        </p>
-    </div>
-    """,
+    f"<div class='file-label'>📘 Журнал: {file_journal.name}</div>",
     unsafe_allow_html=True,
 )
+
+if kadry_file is not None:
+    st.markdown(
+        f"<div class='file-label'>📗 Кадровый файл: {kadry_file.name}</div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        "<div class='file-label' style='background-color:#f5f5f5; color:#555;'>"
+        "📗 Кадровый файл: не загружен"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 # --- Шаг 1. Загрузка файлов ---
 st.header("Шаг 1. Загрузка файлов")
@@ -352,6 +354,36 @@ if st.button("🚀 Обработать данные"):
         st.error(f"❌ Ошибка при обработке данных: {e}")
     else:
         st.success("✅ Обработка завершена.")
+
+    # --- ДОБАВЛЯЕМ ПРИЧИНЫ ОТСУТСТВИЯ ИЗ КАДРОВОГО ОТЧЁТА (как в Колабе) ---
+    if final_df is not None and kadry_dates is not None and not kadry_dates.empty:
+        tmp = final_df.copy()
+
+        # 1) Ключи по дате
+        tmp["Дата_key"] = pd.to_datetime(
+            tmp["Дата"], dayfirst=True, errors="coerce"
+        ).dt.date
+        kd = kadry_dates.copy()
+        kd["Дата_key"] = kd["Дата"]          # там уже date
+
+        # 2) Ключи по ФИО (нижний регистр, без лишних пробелов)
+        tmp["ФИО_key"] = tmp["ФИО"].astype(str).str.strip().str.lower()
+        kd["ФИО_key"] = kd["ФИО"].astype(str).str.strip().str.lower()
+
+        # 3) Соединяем
+        tmp = tmp.merge(
+            kd[["ФИО_key", "Дата_key", "Тип"]],
+            on=["ФИО_key", "Дата_key"],
+            how="left",
+        )
+
+        # 4) Переносим в человекочитаемую колонку
+        tmp["Причина отсутствия"] = tmp["Тип"]
+
+        # 5) Убираем служебные колонки
+        tmp = tmp.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
+
+        final_df = tmp
 
 # Если ещё не нажали кнопку или произошла ошибка — дальше не идём
 if final_df is None:
@@ -488,6 +520,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
