@@ -352,7 +352,7 @@ final_df = None
 if st.button("🚀 Обработать данные"):
     try:
         # kadry_file может быть None — это нормально
-        final_df = build_report(file_journal, None)
+        final_df = build_report(file_journal)
     except Exception as e:
         st.error(f"❌ Ошибка при обработке данных: {e}")
     else:
@@ -523,4 +523,5 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
