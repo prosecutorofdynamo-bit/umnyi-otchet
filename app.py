@@ -204,54 +204,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
-st.markdown(
-    f"<div class='file-label'>📘 Журнал: {file_journal.name}</div>",
-    unsafe_allow_html=True,
-)
-
-if kadry_file is not None:
-    st.markdown(
-        f"<div class='file-label'>📗 Кадровый файл: {kadry_file.name}</div>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        "<div class='file-label' style='background-color:#f5f5f5; color:#555;'>"
-        "📗 Кадровый файл: не загружен"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-# --- Шаг 1. Загрузка файлов ---
-st.header("Шаг 1. Загрузка файлов")
-
-col_left, col_right = st.columns([2, 1])
-
-with col_left:
-    # -------- ЖУРНАЛ ПРОХОДОВ --------
-    st.subheader("📘 Журнал проходов")
-
-    # Наш красивый русский текст вместо английского
-    st.markdown(
-        """
-        <div style="
-            padding: 10px; 
-            background-color: #eef3ff; 
-            border-radius: 6px; 
-            border: 1px solid #d0d7ea; 
-            margin-bottom: 8px; 
-            color:#003366;
-        ">
-            📤 <b>Загрузите файл журнала проходов</b><br>
-            <span style="font-size: 14px;">
-                Формат: XLS или XLSX, размер до 200 МБ.
-            </span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     file_journal = st.file_uploader(
         "Журнал проходов",            # системная подпись (мы её скрываем CSS)
         type=["xls", "xlsx"],
@@ -520,6 +472,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
