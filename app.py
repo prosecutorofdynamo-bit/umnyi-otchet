@@ -352,41 +352,41 @@ final_df = None
 if st.button("🚀 Обработать данные"):
     try:
         # kadry_file может быть None — это нормально
-        final_df = build_report(file_journal)
+        final_df = build_report(file_journal, kadry_file)
     except Exception as e:
         st.error(f"❌ Ошибка при обработке данных: {e}")
     else:
         st.success("✅ Обработка завершена.")
 
-    # --- ДОБАВЛЯЕМ ПРИЧИНЫ ОТСУТСТВИЯ ИЗ КАДРОВОГО ОТЧЁТА (как в Колабе) ---
-    if final_df is not None and kadry_dates is not None and not kadry_dates.empty:
-        tmp = final_df.copy()
+        # --- ДОБАВЛЯЕМ ПРИЧИНЫ ОТСУТСТВИЯ ИЗ КАДРОВОГО ОТЧЁТА (как в Колабе) ---
+        if kadry_dates is not None and not kadry_dates.empty:
+            tmp = final_df.copy()
 
-        # 1) Ключи по дате
-        tmp["Дата_key"] = pd.to_datetime(
-            tmp["Дата"], dayfirst=True, errors="coerce"
-        ).dt.date
-        kd = kadry_dates.copy()
-        kd["Дата_key"] = kd["Дата"]          # там уже date
+            # 1) Ключи по дате
+            tmp["Дата_key"] = pd.to_datetime(
+                tmp["Дата"], dayfirst=True, errors="coerce"
+            ).dt.date
+            kd = kadry_dates.copy()
+            kd["Дата_key"] = kd["Дата"]          # там уже date
 
-        # 2) Ключи по ФИО (нижний регистр, без лишних пробелов)
-        tmp["ФИО_key"] = tmp["ФИО"].astype(str).str.strip().str.lower()
-        kd["ФИО_key"] = kd["ФИО"].astype(str).str.strip().str.lower()
+            # 2) Ключи по ФИО (нижний регистр, без лишних пробелов)
+            tmp["ФИО_key"] = tmp["ФИО"].astype(str).str.strip().str.lower()
+            kd["ФИО_key"] = kd["ФИО"].astype(str).str.strip().str.lower()
 
-        # 3) Соединяем
-        tmp = tmp.merge(
-            kd[["ФИО_key", "Дата_key", "Тип"]],
-            on=["ФИО_key", "Дата_key"],
-            how="left",
-        )
+            # 3) Соединяем
+            tmp = tmp.merge(
+                kd[["ФИО_key", "Дата_key", "Тип"]],
+                on=["ФИО_key", "Дата_key"],
+                how="left",
+            )
 
-        # 4) Переносим в человекочитаемую колонку
-        tmp["Причина отсутствия"] = tmp["Тип"]
+            # 4) Переносим в человекочитаемую колонку
+            tmp["Причина отсутствия"] = tmp["Тип"]
 
-        # 5) Убираем служебные колонки
-        tmp = tmp.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
+            # 5) Убираем служебные колонки
+            tmp = tmp.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
 
-        final_df = tmp
+            final_df = tmp
 
 # Если ещё не нажали кнопку или произошла ошибка — дальше не идём
 if final_df is None:
@@ -523,5 +523,6 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
