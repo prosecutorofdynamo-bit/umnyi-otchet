@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import io  # для формирования файла Excel в памяти
-import unicodedata  # ← ДОБАВЬ ЭТО
+import unicodedata
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report  # берём функцию из engine.py
+
 
 def fio_norm(s: str) -> str:
     s = "" if pd.isna(s) else str(s)
@@ -12,6 +13,7 @@ def fio_norm(s: str) -> str:
     s = s.replace("ё", "е").replace("Ё", "Е")
     s = " ".join(s.strip().split()).lower()
     return s
+
 
 def build_kadry_dates_from_df(kadry: pd.DataFrame) -> pd.DataFrame:
     """
@@ -40,7 +42,7 @@ def build_kadry_dates_from_df(kadry: pd.DataFrame) -> pd.DataFrame:
     # 2) Берём эту строку как шапку
     kadry = kadry.copy()
     kadry.columns = kadry.iloc[hdr_row]
-    kadry = kadry.iloc[hdr_row + 1 :]  # ниже заголовка
+    kadry = kadry.iloc[hdr_row + 1:]  # ниже заголовка
 
     # 3) Оставляем нужные колонки
     kadry = kadry.rename(
@@ -83,6 +85,7 @@ def build_kadry_dates_from_df(kadry: pd.DataFrame) -> pd.DataFrame:
     )
 
     return kadry_dates
+
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -204,10 +207,55 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
+st.markdown(
+    """
+    <div style="text-align: center; padding: 20px; background-color: #F0F4FF;
+                border-radius: 10px; margin-bottom: 1.5rem;">
+        <h2 style="color: #003366; margin-bottom: 0.5rem;">
+            📊 Умный контроль рабочего времени
+        </h2>
+        <p style="color: #003366; font-size:16px; margin: 0;">
+            Загрузите журнал проходов и (по желанию) файл кадров — система автоматически сформирует табель,
+            рассчитает недоработки, выходы, длительные отсутствия и причины прогула.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- Шаг 1. Загрузка файлов ---
+st.header("Шаг 1. Загрузка файлов")
+
+col_left, col_right = st.columns([2, 1])
+
+with col_left:
+    # -------- ЖУРНАЛ ПРОХОДОВ --------
+    st.subheader("📘 Журнал проходов")
+
+    st.markdown(
+        """
+        <div style="
+            padding: 10px; 
+            background-color: #eef3ff; 
+            border-radius: 6px; 
+            border: 1px solid #d0d7ea; 
+            margin-bottom: 8px; 
+            color:#003366;
+        ">
+            📤 <b>Загрузите файл журнала проходов</b><br>
+            <span style="font-size: 14px;">
+                Формат: XLS или XLSX, размер до 200 МБ.
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     file_journal = st.file_uploader(
-        "Журнал проходов",            # системная подпись (мы её скрываем CSS)
+        "Журнал проходов",
         type=["xls", "xlsx"],
-        label_visibility="collapsed",  # скрыть стандартный label
+        label_visibility="collapsed",
         help="Файл журнала из системы проходов (XLS/XLSX)."
     )
 
@@ -236,7 +284,10 @@ st.markdown(
         unsafe_allow_html=True,
     )
 
-    kadry_file = st.file_uploader("Загрузите файл кадров (.xls / .xlsx)", type=["xls", "xlsx"])
+    kadry_file = st.file_uploader(
+        "Загрузите файл кадров (.xls / .xlsx)",
+        type=["xls", "xlsx"]
+    )
 
 kadry_dates = None
 if kadry_file is not None:
@@ -472,39 +523,3 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
