@@ -2,6 +2,7 @@ import pandas as pd
 import io
 import unicodedata
 import re
+import numpy as np
 
 from datetime import datetime, date
 
@@ -569,13 +570,19 @@ def fio_match_key(s):
 def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     Главная функция: получает файл журнала и, при наличии, кадровый файл.
-    Возвращает готовый pandas.DataFrame для выгрузки в Excel.
-    Если kadry_file = None, колонка «Причина отсутствия» остаётся пустой.
+    Возвращает готовый pandas.DataFrame для выгрузки в Excel:
+      - полный журнал по дням с временем прихода/ухода,
+      - опоздания,
+      - выходы,
+      - "Вне офиса",
+      - Итого за день / за неделю,
+      - Недоработки,
+      - Причина отсутствия (если загружен кадровый файл).
     """
-    # читаем журнал
+    # 1) Читаем журнал
     df = read_journal(journal_file)
 
-    # автоматически выбираем колонку для направлений ('Вход' или 'Выход')
+    # 2) Авто-выбор колонки направлений ("Вход" или "Выход")
     def _total_outside(col):
         t = compute_outside_table(df, col)
         return pd.to_numeric(t["Вне_ядра_мин"], errors="coerce").fillna(0).sum()
@@ -584,50 +591,98 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     sum_entry = _total_outside("Вход")
     right_col = "Вход" if sum_entry <= sum_exit else "Выход"
 
-    # пересчитываем окончательную таблицу «Вне офиса» по выбранной колонке
-    out_df = compute_outside_table(df, right_col)
+    # 3) Основные таблицы по дням
+    out_df = compute_outside_table(df, right_col)           # Вне офиса, длинные перерывы
+    stats_df = _calc_group_stats(df)                        # Общее время, опоздание
+    exits_df = _calc_exits_and_suspect(df, right_col)       # Выходы, suspect (флаг пока не используем)
 
-    # если кадрового файла НЕТ — просто добавляем пустую причину отсутствия
+    # 4) Склеиваем всё в один дневной журнал
+    final = out_df.merge(
+        stats_df[["ФИО", "Дата", "Общее время", "Продолжительность_мин", "Опоздание"]],
+        on=["ФИО", "Дата"],
+        how="left",
+    )
+    final = final.merge(
+        exits_df[["ФИО", "Дата", "Выходы"]],
+        on=["ФИО", "Дата"],
+        how="left",
+    )
+
+    # 5) ИТОГО ЗА ДЕНЬ + НЕДОРАБОТКИ (упрощённая схема как в Колабе)
+    duration = pd.to_numeric(final["Продолжительность_мин"], errors="coerce").fillna(0).astype(int)
+    out_core = pd.to_numeric(final["Вне_ядра_мин"], errors="coerce").fillna(0).astype(int)
+
+    small_shift = duration < 60          # смена меньше часа
+    lunch = np.where(small_shift, 0, 60) # обед 60 мин, но не для совсем коротких смен
+    buf = 60                             # буфер "вне ядра" 60 мин
+
+    penalty_base = out_core - buf
+    penalty_out = np.where(small_shift, 0, np.maximum(0, penalty_base))
+
+    final["Итого_дня_мин"] = np.clip(duration - lunch - penalty_out, 0, None).astype(int)
+    final["Итого за день"] = final["Итого_дня_мин"].apply(fmt_hm)
+
+    need_min = np.maximum(0, out_core - buf)
+    final["Недоработки"] = need_min.apply(fmt_hm)
+
+    # 6) ИТОГО ЗА НЕДЕЛЮ (простая сумма по неделе Пн–Вс)
+    final["Дата_ts"] = pd.to_datetime(final["Дата"], errors="coerce")
+    final["week_start"] = final["Дата_ts"] - pd.to_timedelta(final["Дата_ts"].dt.weekday, unit="D")
+
+    week_sum = (
+        final.groupby(["ФИО", "week_start"], as_index=False)["Итого_дня_мин"]
+        .sum()
+        .rename(columns={"Итого_дня_мин": "Итого_нед_мин"})
+    )
+
+    final = final.merge(week_sum, on=["ФИО", "week_start"], how="left")
+    final["Итого за неделю"] = final["Итого_нед_мин"].apply(fmt_hm)
+
+    # 7) Добавляем "Причина отсутствия" из кадрового файла (если есть)
     if kadry_file is None:
-        final = out_df.copy()
         final["Причина отсутствия"] = ""
     else:
-        # читаем кадровый файл
         kadry_dates = read_kadry(kadry_file)
 
-        # создаём ключи ФИО (журнал и кадры) через fio_match_key
-        out_df["ФИО_key"] = out_df["ФИО"].apply(fio_match_key)
+        # ключи ФИО
+        final["ФИО_key"] = final["ФИО"].apply(fio_match_key)
         kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
 
-        # ключи по дате
-        out_df["Дата_key"] = pd.to_datetime(out_df["Дата"], errors="coerce").dt.date
+        # ключи даты
+        final["Дата_key"] = pd.to_datetime(final["Дата_ts"], errors="coerce").dt.date
         kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
 
-        # соединяем
-        final = out_df.merge(
+        final = final.merge(
             kadry_dates[["ФИО_key", "Дата_key", "Тип"]],
             on=["ФИО_key", "Дата_key"],
             how="left",
         )
-
         final["Причина отсутствия"] = final["Тип"]
+        final = final.drop(columns=["ФИО_key", "Дата_key", "Тип"], errors="ignore")
 
-        # убираем служебные колонки
-        final = final.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
+    # 8) Финальное форматирование даты и порядок колонок
+    final["Дата"] = pd.to_datetime(final["Дата_ts"], errors="coerce").dt.strftime("%d-%m-%Y")
 
-    # форматируем дату дд-мм-гггг
-    final["Дата"] = pd.to_datetime(final["Дата"], errors="coerce").dt.strftime("%d-%m-%Y")
-
-    # порядок колонок (лишние — заполним пустыми)
+    # какие колонки хотим видеть в отчёте
     cols_order = [
         "ФИО",
         "Дата",
         "Время прихода",
         "Время ухода",
+        "Опоздание",
+        "Общее время",
         "Вне офиса",
+        "Выходы",
         "Отсутствие более 2 часов подряд",
+        "Итого за день",
+        "Итого за неделю",
+        "Недоработки",
         "Причина отсутствия",
+        # служебные минуты ниже (можно потом скрыть в Excel условным форматированием)
         "Вне_ядра_мин",
+        "Продолжительность_мин",
+        "Итого_дня_мин",
+        "Итого_нед_мин",
     ]
     for c in cols_order:
         if c not in final.columns:
@@ -635,4 +690,8 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
 
     final = final[cols_order]
 
+    # убираем вспомогательные столбцы
+    final = final.drop(columns=["Дата_ts", "week_start"], errors="ignore")
+
     return final
+
