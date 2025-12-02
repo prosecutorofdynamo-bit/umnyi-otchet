@@ -369,9 +369,17 @@ if st.button("🚀 Обработать данные"):
             kd = kadry_dates.copy()
             kd["Дата_key"] = kd["Дата"]          # там уже date
 
-            # 2) Ключи по ФИО (нижний регистр, без лишних пробелов)
-            tmp["ФИО_key"] = tmp["ФИО"].astype(str).str.strip().str.lower()
-            kd["ФИО_key"] = kd["ФИО"].astype(str).str.strip().str.lower()
+                    # 2) Ключи по ФИО:
+        #    - убираем приписку на второй строке "(особый режим работы)"
+        #    - нормализуем через fio_norm (как в двигателе)
+        def clean_fio_for_key(s: str) -> str:
+            s = "" if pd.isna(s) else str(s)
+            # берём только первую строку до перевода строки
+            s = s.split("\n")[0]
+            return fio_norm(s)
+
+        tmp["ФИО_key"] = tmp["ФИО"].map(clean_fio_for_key)
+        kd["ФИО_key"] = kd["ФИО"].map(clean_fio_for_key)
 
             # 3) Соединяем
             tmp = tmp.merge(
@@ -523,6 +531,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
