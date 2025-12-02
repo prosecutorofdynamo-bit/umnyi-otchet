@@ -358,13 +358,13 @@ if st.button("🚀 Обработать данные"):
     else:
         st.success("✅ Обработка завершена.")
 
-        # --- ДОБАВЛЯЕМ ПРИЧИНЫ ОТСУТСТВИЯ ИЗ КАДРОВОГО ОТЧЁТА (как в Колабе) ---
-        if kadry_dates is not None and not kadry_dates.empty:
-            tmp = final_df.copy()
+    # --- ДОБАВЛЯЕМ ПРИЧИНЫ ОТСУТСТВИЯ ИЗ КАДРОВОГО ОТЧЁТА (как в Колабе) ---
+if kadry_dates is not None and not kadry_dates.empty:
+        tmp = final_df.copy()
 
-            # 1) Ключи по дате
-            tmp["Дата_key"] = pd.to_datetime(
-                tmp["Дата"], dayfirst=True, errors="coerce"
+        # 1) Ключи по дате
+         tmp["Дата_key"] = pd.to_datetime(
+            tmp["Дата"], dayfirst=True, errors="coerce"
             ).dt.date
             kd = kadry_dates.copy()
             kd["Дата_key"] = kd["Дата"]          # там уже date
@@ -531,6 +531,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
