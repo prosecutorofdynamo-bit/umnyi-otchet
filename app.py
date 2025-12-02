@@ -295,9 +295,6 @@ else:
 if "ФИО" in final_view.columns and "Дата" in final_view.columns:
     final_view = final_view.sort_values(["ФИО", "Дата"])
 
-# Предпросмотр
-st.dataframe(final_view.head(50))
-
 # ---------------- ФОРМИРОВАНИЕ И СКАЧИВАНИЕ EXCEL ----------------
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -383,3 +380,4 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
