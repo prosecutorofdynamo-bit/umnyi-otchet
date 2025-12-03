@@ -494,7 +494,8 @@ def _calc_group_stats(df: pd.DataFrame):
 def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
     """
     Для каждого дня:
-      - количество выходов в ядре (09–18)
+      - количество выходов в ядре (09–18), считаем только выходы
+        длительностью >= EXIT_MIN_DURATION минут (как в Колабе)
       - флаг 'suspect' (возможен проход вне терминала)
     """
     rows = []
@@ -517,6 +518,7 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
             if lab is None:
                 continue
             t = r["Дата события"]
+
             # дедуп дрожания
             if labels:
                 t_prev = times[-1]
@@ -526,13 +528,34 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
                     and (t - t_prev).total_seconds() / 60.0 <= DEDUP_WINDOW_MIN
                 ):
                     continue
+
             labels.append(lab)
             times.append(t)
 
-        # выходы: переход in -> out
         exits = 0
-        for i in range(1, len(labels)):
-            if labels[i - 1] == "in" and labels[i] == "out":
+
+        # считаем выходами только интервалы "out" достаточной длины
+        for i, lab in enumerate(labels):
+            if lab != "out":
+                continue
+
+            t_out = times[i]
+
+            # ищем ближайший последующий "in"
+            t_in = None
+            for j in range(i + 1, len(labels)):
+                if labels[j] == "in":
+                    t_in = times[j]
+                    break
+
+            # конец выхода — либо следующее "in", либо конец ядра
+            if t_in is not None:
+                t_end = min(t_in, b_core)
+            else:
+                t_end = b_core
+
+            dur = (t_end - t_out).total_seconds() / 60.0
+            if dur >= EXIT_MIN_DURATION:
                 exits += 1
 
         # suspect: два одинаковых подряд события с разрывом > DEDUP_WINDOW_MIN
@@ -554,7 +577,6 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
         )
 
     return pd.DataFrame(rows)
-
 
 # === Ключ для сопоставления ФИО (журнал ↔ кадры) ===
 def fio_match_key(s):
@@ -703,3 +725,4 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
