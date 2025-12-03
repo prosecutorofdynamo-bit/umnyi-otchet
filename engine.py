@@ -414,7 +414,7 @@ def read_kadry(file_obj) -> pd.DataFrame:
             "до": "Дата_по",
         }
     )
-    kadry = kadry["ФИО Тип Дата_с Дата_по".split()].copy()
+    kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
     kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
 
     # умный разбор дат
@@ -441,7 +441,7 @@ def read_kadry(file_obj) -> pd.DataFrame:
     return kadry_dates
 
 
-# --- Доп. логика: опоздания, выходы ---
+# --- Доп. логика: опоздания и выходы ---
 
 def _core_window_for_day(day):
     base = pd.Timestamp(day).normalize()
@@ -453,6 +453,7 @@ def _core_window_for_day(day):
 def _calc_group_stats(df: pd.DataFrame):
     """
     Для каждого (ФИО, Рабочий_день):
+      - первый/последний проход
       - длительность
       - опоздание / вовремя
     """
@@ -461,37 +462,38 @@ def _calc_group_stats(df: pd.DataFrame):
         grp = grp.sort_values("Дата события")
         first_ts = grp["Дата события"].iloc[0]
         last_ts = grp["Дата события"].iloc[-1]
-        if pd.notna(last_ts) and pd.notna(first_ts):
-            dur_min = int((last_ts - first_ts).total_seconds() / 60.0)
-        else:
-            dur_min = 0
+        dur_min = int(
+            (last_ts - first_ts).total_seconds() / 60.0
+        ) if pd.notna(last_ts) and pd.notna(first_ts) else 0
 
         # порог опоздания 09:01
         plan_start = pd.Timestamp(day) + pd.Timedelta(hours=LATE_H, minutes=LATE_M)
-        if pd.notna(first_ts):
-            late_min = (first_ts - plan_start).total_seconds() / 60.0
-        else:
-            late_min = 0
+        late_min = (
+            first_ts - plan_start
+        ).total_seconds() / 60.0 if pd.notna(first_ts) else 0
         status = "опоздание" if late_min > 0 else "вовремя"
 
         rows.append(
             {
                 "ФИО": fio,
                 "Дата": pd.to_datetime(day).date(),
+                "first_ts": first_ts,
+                "last_ts": last_ts,
                 "Продолжительность_мин": max(dur_min, 0),
                 "Опоздание": status,
             }
         )
 
-    st_df = pd.DataFrame(rows)
-    st_df["Общее время"] = st_df["Продолжительность_мин"].apply(fmt_hm)
-    return st_df
+    st = pd.DataFrame(rows)
+    st["Общее время"] = st["Продолжительность_мин"].apply(fmt_hm)
+    return st
 
 
-def _calc_exits(df: pd.DataFrame, right_col: str):
+def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
     """
     Для каждого дня:
       - количество выходов в ядре (09–18)
+      - флаг 'suspect' (возможен проход вне терминала)
     """
     rows = []
 
@@ -531,62 +533,6 @@ def _calc_exits(df: pd.DataFrame, right_col: str):
             if labels[i - 1] == "in" and labels[i] == "out":
                 exits += 1
 
-        rows.append(
-            {
-                "ФИО": fio,
-                "Дата": base.date(),
-                "Выходы": exits,
-            }
-        )
-
-    return pd.DataFrame(rows)
-
-def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
-    """
-    Для каждого (ФИО, Рабочий_день):
-      - количество выходов в ядре (09–18)
-      - флаг 'suspect' (возможен проход вне терминала)
-    """
-    rows = []
-
-    for (fio, day), grp in df.groupby(["ФИО", "Рабочий_день"], sort=False):
-        base = pd.Timestamp(day).normalize()
-        a_core, b_core = _core_window_for_day(base)
-
-        g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
-        g["dest_n"] = g[right_col].map(norm)
-
-        # только события в ядре
-        g = g[(g["Дата события"] >= a_core) & (g["Дата события"] <= b_core)]
-
-        labels = []
-        times = []
-        for _, r in g.iterrows():
-            s = r["dest_n"]
-            lab = "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
-            if lab is None:
-                continue
-            t = r["Дата события"]
-
-            # дедуп дрожания (<= DEDUP_WINDOW_MIN минут)
-            if labels:
-                t_prev = times[-1]
-                lab_prev = labels[-1]
-                if (
-                    lab == lab_prev
-                    and (t - t_prev).total_seconds() / 60.0 <= DEDUP_WINDOW_MIN
-                ):
-                    continue
-
-            labels.append(lab)
-            times.append(t)
-
-        # количество выходов: переход in -> out
-        exits = 0
-        for i in range(1, len(labels)):
-            if labels[i - 1] == "in" and labels[i] == "out":
-                exits += 1
-
         # suspect: два одинаковых подряд события с разрывом > DEDUP_WINDOW_MIN
         suspect = False
         for i in range(1, len(labels)):
@@ -607,6 +553,7 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
 
     return pd.DataFrame(rows)
 
+
 # === Ключ для сопоставления ФИО (журнал ↔ кадры) ===
 def fio_match_key(s):
     s = "" if pd.isna(s) else str(s)
@@ -622,17 +569,12 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     Главная функция: получает файл журнала и, при наличии, кадровый файл.
     Возвращает готовый pandas.DataFrame для выгрузки в Excel.
-
-    ⚠ Важно:
-    - логика проще, чем в Колабе (нет персональных норм, ЛАБ, СК, Реестра),
-      поэтому цифры могут не совпадать 1-в-1 с Колабом;
-    - Но формат отчёта «человеческий»: Опоздание, Выходы, Итого за день, Итого за неделю,
-      Недоработки, и Причина отсутствия.
+    Логика по ИТОГО ЗА ДЕНЬ и ИТОГО ЗА НЕДЕЛЮ максимально близка к Колабу.
     """
-    # ---------- 1. Читаем журнал ----------
+    # читаем журнал
     df = read_journal(journal_file)
 
-    # ---------- 2. Автовыбор колонки направлений: 'Вход' или 'Выход' ----------
+    # автоматически выбираем колонку для направлений ('Вход' или 'Выход')
     def _total_outside(col):
         t = compute_outside_table(df, col)
         return pd.to_numeric(t["Вне_ядра_мин"], errors="coerce").fillna(0).sum()
@@ -641,105 +583,119 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     sum_entry = _total_outside("Вход")
     right_col = "Вход" if sum_entry <= sum_exit else "Выход"
 
-    # Основная таблица "Вне офиса"
+    # пересчитываем окончательную таблицу «Вне офиса» по выбранной колонке
     out_df = compute_outside_table(df, right_col)
 
-    # ---------- 3. Статистика по смене: первое/последнее событие, длительность, опоздание ----------
+    # считаем групповые статистики (опоздание, длительность, first/last)
     stats_df = _calc_group_stats(df)
-    # оставляем нужное
-    stats_df = stats_df[
-        ["ФИО", "Дата", "Продолжительность_мин", "Общее время", "Опоздание"]
-    ]
 
-    # ---------- 4. Выходы и флаг suspect ----------
+    # считаем выходы
     exits_df = _calc_exits_and_suspect(df, right_col)
-    exits_df = exits_df[["ФИО", "Дата", "Выходы"]]  # suspect пока не выводим
 
-    # ---------- 5. Собираем всё в одну таблицу ----------
-    final = out_df.merge(stats_df, on=["ФИО", "Дата"], how="left")
-    final = final.merge(exits_df, on=["ФИО", "Дата"], how="left")
+    # мержим всё по ФИО + Дата
+    merged = out_df.merge(
+        stats_df[["ФИО", "Дата", "Продолжительность_мин", "Опоздание", "Общее время"]],
+        on=["ФИО", "Дата"],
+        how="left",
+    )
 
-    # подчищаем NaN
-    final["Продолжительность_мин"] = pd.to_numeric(
-        final["Продолжительность_мин"], errors="coerce"
+    merged = merged.merge(
+        exits_df[["ФИО", "Дата", "Выходы"]],
+        on=["ФИО", "Дата"],
+        how="left",
+    )
+
+    merged["Выходы"] = merged["Выходы"].fillna(0).astype(int)
+
+    # === Шаг 1. ИТОГО ЗА ДЕНЬ (формула как в Колабе, без 4-часовых персонально) ===
+    merged["Продолжительность_мин"] = pd.to_numeric(
+        merged["Продолжительность_мин"], errors="coerce"
     ).fillna(0).astype(int)
 
-    final["Общее время"] = final["Общее время"].where(
-        final["Общее время"].notna(),
-        final["Продолжительность_мин"].apply(fmt_hm),
-    )
+    merged["Вне_ядра_мин"] = pd.to_numeric(
+        merged["Вне_ядра_мин"], errors="coerce"
+    ).fillna(0).astype(int)
 
-    final["Опоздание"] = final["Опоздание"].fillna("")
-    final["Выходы"] = final["Выходы"].fillna(0).astype(int)
+    # маленькие смены (< 60 минут) — ничего не считаем
+    small = merged["Продолжительность_мин"] < 60
 
-    # ---------- 6. Итого за день / Итого за неделю / Недоработки ----------
-    # Пока берём Итого_дня как общую длительность 06–06
-    final["Итого_дня_мин"] = final["Продолжительность_мин"]
-    final["Итого за день"] = final["Итого_дня_мин"].apply(fmt_hm)
+    # обед: если смена < 60 мин → 0; иначе 60 минут
+    lunch = (~small) * 60
+    lunch = lunch.astype(int)
 
-    # Недоработки: просто берём минуты "вне ядра" (как очень упрощённый вариант)
-    final["Недоработки"] = final["Вне_ядра_мин"].apply(fmt_hm)
+    # буфер "вне ядра": всегда 60 минут (как для обычных сотрудников в Колабе)
+    buf = 60
 
-    # Итого за неделю: суммируем Итого_дня_мин по понедельничным неделям
-    final["_Дата_ts"] = pd.to_datetime(final["Дата"], errors="coerce")
-    final["week_monday"] = final["_Дата_ts"] - pd.to_timedelta(
-        final["_Дата_ts"].dt.weekday, unit="D"
-    )
+    # штраф за "вне ядра": если смена < 60 мин → 0; иначе max(0, вне_ядра - буфер)
+    penalty_base = merged["Вне_ядра_мин"] - buf
+    penalty_out = penalty_base.where(~small, 0)
+    penalty_out = penalty_out.clip(lower=0).astype(int)
 
-    week_sum = (
-        final.groupby(["ФИО", "week_monday"])["Итого_дня_мин"]
-        .sum()
-        .reset_index()
-        .rename(columns={"Итого_дня_мин": "Итого_нед_мин"})
-    )
+    merged["Итого_дня_мин"] = (
+        merged["Продолжительность_мин"] - lunch - penalty_out
+    ).clip(lower=0).astype(int)
 
-    final = final.merge(
-        week_sum, on=["ФИО", "week_monday"], how="left"
-    )
-    final["Итого за неделю"] = final["Итого_нед_мин"].apply(fmt_hm)
+    merged["Итого за день"] = merged["Итого_дня_мин"].apply(fmt_hm)
 
-    # ---------- 7. Добавляем кадровые причины отсутствия (если файл есть) ----------
+    # Недоработки = max(0, вне_ядра - буфер)
+    need_min = (merged["Вне_ядра_мин"] - buf).clip(lower=0).astype(int)
+    merged["Недоработки"] = need_min.apply(fmt_hm)
+
+    # === Шаг 2. ИТОГО ЗА НЕДЕЛЮ (ТОЛЬКО в последний рабочий день недели) ===
+    merged["Дата_dt"] = pd.to_datetime(merged["Дата"], errors="coerce")
+    merged = merged.sort_values(["ФИО", "Дата_dt"])
+
+    merged["Итого за неделю"] = ""
+    merged["Итого_нед_мин"] = 0
+
+    # неделя с понедельника
+    merged["Неделя"] = merged["Дата_dt"].dt.to_period("W-MON")
+
+    for (fio, week), sub in merged.groupby(["ФИО", "Неделя"], sort=False):
+        eff = sub["Итого_дня_мин"].fillna(0).astype(int).sum()
+        if eff <= 0:
+            continue
+        last_idx = sub.index[-1]
+        merged.at[last_idx, "Итого за неделю"] = fmt_hm(eff)
+        merged.at[last_idx, "Итого_нед_мин"] = int(eff)
+
+    # === Кадровые данные (причины отсутствия) ===
     if kadry_file is None:
-        final["Причина отсутствия"] = ""
+        merged["Причина отсутствия"] = ""
     else:
         kadry_dates = read_kadry(kadry_file)
 
-        # Ключи для аккуратного матча ФИО + Дата
-        final["ФИО_key"] = final["ФИО"].apply(fio_match_key)
+        # ключи ФИО и даты
+        merged["ФИО_key"] = merged["ФИО"].apply(fio_match_key)
         kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
 
-        final["Дата_key"] = pd.to_datetime(
-            final["Дата"], errors="coerce"
-        ).dt.date
+        merged["Дата_key"] = pd.to_datetime(merged["Дата_dt"], errors="coerce").dt.date
         kadry_dates["Дата_key"] = pd.to_datetime(
             kadry_dates["Дата"], errors="coerce"
         ).dt.date
 
-        final = final.merge(
+        merged = merged.merge(
             kadry_dates[["ФИО_key", "Дата_key", "Тип"]],
             on=["ФИО_key", "Дата_key"],
             how="left",
         )
-        final["Причина отсутствия"] = final["Тип"]
-        final = final.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
 
-    # ---------- 8. Финальная косметика ----------
-    # Дата в формате дд-мм-гггг
-    final["Дата"] = pd.to_datetime(
-        final["Дата"], errors="coerce"
-    ).dt.strftime("%d-%m-%Y")
+        merged["Причина отсутствия"] = merged["Тип"]
+        merged = merged.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
 
-    # убираем вспомогательные
-    final = final.drop(columns=["_Дата_ts", "week_monday"], errors="ignore")
+    # форматируем дату дд-мм-гггг
+    merged["Дата"] = pd.to_datetime(merged["Дата_dt"], errors="coerce").dt.strftime(
+        "%d-%m-%Y"
+    )
 
-    # Порядок колонок
+    # окончательный порядок колонок
     cols_order = [
         "ФИО",
         "Дата",
         "Время прихода",
         "Время ухода",
-        "Общее время",
         "Опоздание",
+        "Общее время",
         "Вне офиса",
         "Выходы",
         "Отсутствие более 2 часов подряд",
@@ -748,14 +704,17 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         "Недоработки",
         "Причина отсутствия",
         "Вне_ядра_мин",
+        "Итого_дня_мин",
+        "Итого_нед_мин",
     ]
     for c in cols_order:
-        if c not in final.columns:
-            final[c] = ""
+        if c not in merged.columns:
+            # для служебных мин.колонок — 0, для остальных — пустая строка
+            if c in ("Итого_дня_мин", "Итого_нед_мин", "Вне_ядра_мин"):
+                merged[c] = 0
+            else:
+                merged[c] = ""
 
-    final = final[cols_order]
+    final = merged[cols_order].copy()
 
     return final
-
-
-
