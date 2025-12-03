@@ -59,6 +59,7 @@ CORE_START_H, CORE_START_M = 9, 0
 CORE_END_H,   CORE_END_M   = 18, 0
 DAY_CORE_MIN = 8 * 60       # 8 часов ядра
 LATE_H, LATE_M = 9, 1       # опоздание с 09:01
+
 EXIT_MIN_DURATION = 5   # учитывать только выходы длительностью от 5 минут
 
 def fmt_hm(m) -> str:
@@ -725,5 +726,6 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
