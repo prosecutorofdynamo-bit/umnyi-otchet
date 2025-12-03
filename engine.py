@@ -94,6 +94,178 @@ def norm(s):
     return unicodedata.normalize("NFKC", s).strip().casefold()
 
 
+# --- Фильтрация «не людей» (карты, клининг и т.п.) ---
+NONPERSON_TOKENS = [
+    "студент",
+    "клининг",
+    "уборщ",
+    "водител",
+    "охран",
+    "технич",
+    "персонал",
+    "инженер без",
+    "без фио",
+    "безфио",
+    "аэростар",
+    "aerostar",
+    "техносервис",
+    "техно-сервис",
+    "техносерв",
+    "отель",
+    "гостиниц",
+    "стажер",
+    "стажёр",
+    "практикант",
+    "интерн",
+    "ассистент",
+    "ученик",
+]
+WHOLE_WORD_TOKENS = ["ооо", "оао", "пао", "зао", "ип"]
+EXCLUDE_NAME_ALIASES = {"пелешок", "пешелка"}
+
+
+def is_nonperson(fio: str) -> bool:
+    s = "" if fio is None else str(fio)
+    s = unicodedata.normalize("NFKC", s).strip().casefold()
+    if not s:
+        return True
+    if any(alias in s for alias in EXCLUDE_NAME_ALIASES):
+        return True
+    if any(tok in s for tok in NONPERSON_TOKENS):
+        return True
+    if re.search(r"\b(?:" + "|".join(map(re.escape, WHOLE_WORD_TOKENS)) + r")\b", s):
+        return True
+    if any(ch.isdigit() for ch in s):
+        return True
+    return False
+
+
+# ===================== ЧТЕНИЕ ЖУРНАЛА =====================
+
+def read_journal(file_obj) -> pd.DataFrame:
+    """
+    Читаем журнал проходов из Excel.
+    Ожидаем колонки:
+    ['Событие','Дата события','Фамилия','Имя','Отчество','Вход','Выход']
+    """
+    need = ["Событие", "Дата события", "Фамилия", "Имя", "Отчество", "Вход", "Выход"]
+
+    content = file_obj.read()
+    df_raw = None
+    for skip in (3, 0, 1, 2):
+        try:
+            _tmp = pd.read_excel(io.BytesIO(content), engine="openpyxl", skiprows=skip)
+            if set(need).issubset(_tmp.columns):
+                df_raw = _tmp
+                break
+        except Exception:
+            continue
+
+    if df_raw is None:
+        raise RuntimeError(
+            "Не удалось прочитать журнал: не найдены нужные колонки "
+            f"(ожидались: {need}). Проверьте формат файла."
+        )
+
+    df = df_raw[need].copy()
+    df["Событие_n"] = df["Событие"].apply(norm)
+    df = df[
+        df["Событие_n"].str.contains("проход по идентификатору", na=False)
+    ].copy()
+
+    for c in ["Фамилия", "Имя", "Отчество"]:
+        df[c] = df[c].where(df[c].notna(), "").astype(str).str.strip()
+
+    def _join_fio(row):
+        parts = [row["Фамилия"], row["Имя"], row["Отчество"]]
+        return " ".join(p for p in parts if p)
+
+    df["ФИО"] = (
+        df.apply(_join_fio, axis=1)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+
+    # умный разбор даты
+    df["Дата события"] = df["Дата события"].apply(smart_parse_date)
+    df = df.dropna(subset=["Дата события"]).sort_values("Дата события")
+    df["Рабочий_день"] = df["Дата события"].apply(work_day)
+
+    df["Вход_n"] = df["Вход"].apply(norm)
+    df["Выход_n"] = df["Выход"].apply(norm)
+    ok = ~(
+        df["Вход_n"].str.contains("неконтролируем", na=False)
+        | df["Выход_n"].str.contains("неконтролируем", na=False)
+    )
+    df = df[ok].copy()
+
+    df = df[~df["ФИО"].apply(is_nonperson)].copy()
+
+    return df
+
+
+# ===================== ЧТЕНИЕ КАДРОВОГО ФАЙЛА =====================
+
+def read_kadry(file_obj) -> pd.DataFrame:
+    """
+    Читаем кадровый файл и разворачиваем интервалы в посуточный список.
+    Ожидаем колонки: 'Сотрудник', 'Вид отсутствия', 'с', 'до'.
+    """
+    kadry = pd.read_excel(file_obj, header=None)
+
+    # ищем строку, где в любой колонке есть 'Сотрудник'
+    def _is_sotr_cell(x):
+        s = "" if pd.isna(x) else str(x)
+        return s.strip().casefold() == "сотрудник"
+
+    mask_rows = kadry.apply(lambda row: row.map(_is_sotr_cell).any(), axis=1)
+    idxs = kadry.index[mask_rows]
+    if len(idxs) == 0:
+        raise RuntimeError(
+            "Не удалось найти строку с заголовком 'Сотрудник' в кадровом файле."
+        )
+
+    hdr_row = idxs[0]
+    kadry.columns = kadry.iloc[hdr_row]
+    kadry = kadry.iloc[hdr_row + 1 :]
+
+    kadry = kadry.rename(
+        columns={
+            "Сотрудник": "ФИО",
+            "Вид отсутствия": "Тип",
+            "с": "Дата_с",
+            "до": "Дата_по",
+        }
+    )
+    kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
+    kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
+
+    # умный разбор дат
+    for col in ["Дата_с", "Дата_по"]:
+        kadry[col] = kadry[col].apply(smart_parse_date)
+
+    kadry["Дата_по"] = kadry["Дата_по"].fillna(kadry["Дата_с"])
+
+    rows = []
+    for _, r in kadry.iterrows():
+        d1, d2 = r["Дата_с"], r["Дата_по"]
+        if pd.isna(d1) or pd.isna(d2):
+            continue
+        for d in pd.date_range(d1, d2, freq="D"):
+            rows.append({"ФИО": r["ФИО"], "Дата": d.date(), "Тип": r["Тип"]})
+
+    kadry_dates = pd.DataFrame(rows)
+
+    # замена «гос. обязанности» -> «Сдача крови»
+    kadry_dates["Тип"] = kadry_dates["Тип"].replace(
+        to_replace=r"(?i).*гос.*обязан.*", value="Сдача крови", regex=True
+    )
+
+    return kadry_dates
+
+
+# === Время внутри офиса и длинный разрыв вне офиса ===
+
 def inside_minutes_between(
     grp: pd.DataFrame,
     right_col: str,
@@ -271,177 +443,7 @@ def compute_outside_table(df: pd.DataFrame, right_col: str) -> pd.DataFrame:
     ]
 
 
-# --- Фильтрация «не людей» (карты, клининг и т.п.) ---
-NONPERSON_TOKENS = [
-    "студент",
-    "клининг",
-    "уборщ",
-    "водител",
-    "охран",
-    "технич",
-    "персонал",
-    "инженер без",
-    "без фио",
-    "безфио",
-    "аэростар",
-    "aerostar",
-    "техносервис",
-    "техно-сервис",
-    "техносерв",
-    "отель",
-    "гостиниц",
-    "стажер",
-    "стажёр",
-    "практикант",
-    "интерн",
-    "ассистент",
-    "ученик",
-]
-WHOLE_WORD_TOKENS = ["ооо", "оао", "пао", "зао", "ип"]
-EXCLUDE_NAME_ALIASES = {"пелешок", "пешелка"}
-
-
-def is_nonperson(fio: str) -> bool:
-    s = "" if fio is None else str(fio)
-    s = unicodedata.normalize("NFKC", s).strip().casefold()
-    if not s:
-        return True
-    if any(alias in s for alias in EXCLUDE_NAME_ALIASES):
-        return True
-    if any(tok in s for tok in NONPERSON_TOKENS):
-        return True
-    if re.search(r"\b(?:" + "|".join(map(re.escape, WHOLE_WORD_TOKENS)) + r")\b", s):
-        return True
-    if any(ch.isdigit() for ch in s):
-        return True
-    return False
-
-
-# ===================== ЧТЕНИЕ ЖУРНАЛА =====================
-
-def read_journal(file_obj) -> pd.DataFrame:
-    """
-    Читаем журнал проходов из Excel.
-    Ожидаем колонки:
-    ['Событие','Дата события','Фамилия','Имя','Отчество','Вход','Выход']
-    """
-    need = ["Событие", "Дата события", "Фамилия", "Имя", "Отчество", "Вход", "Выход"]
-
-    content = file_obj.read()
-    df_raw = None
-    for skip in (3, 0, 1, 2):
-        try:
-            _tmp = pd.read_excel(io.BytesIO(content), engine="openpyxl", skiprows=skip)
-            if set(need).issubset(_tmp.columns):
-                df_raw = _tmp
-                break
-        except Exception:
-            continue
-
-    if df_raw is None:
-        raise RuntimeError(
-            "Не удалось прочитать журнал: не найдены нужные колонки "
-            f"(ожидались: {need}). Проверьте формат файла."
-        )
-
-    df = df_raw[need].copy()
-    df["Событие_n"] = df["Событие"].apply(norm)
-    df = df[
-        df["Событие_n"].str.contains("проход по идентификатору", na=False)
-    ].copy()
-
-    for c in ["Фамилия", "Имя", "Отчество"]:
-        df[c] = df[c].where(df[c].notna(), "").astype(str).str.strip()
-
-    def _join_fio(row):
-        parts = [row["Фамилия"], row["Имя"], row["Отчество"]]
-        return " ".join(p for p in parts if p)
-
-    df["ФИО"] = (
-        df.apply(_join_fio, axis=1)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.strip()
-    )
-
-    # умный разбор даты
-    df["Дата события"] = df["Дата события"].apply(smart_parse_date)
-    df = df.dropna(subset=["Дата события"]).sort_values("Дата события")
-    df["Рабочий_день"] = df["Дата события"].apply(work_day)
-
-    df["Вход_n"] = df["Вход"].apply(norm)
-    df["Выход_n"] = df["Выход"].apply(norm)
-    ok = ~(
-        df["Вход_n"].str.contains("неконтролируем", na=False)
-        | df["Выход_n"].str.contains("неконтролируем", na=False)
-    )
-    df = df[ok].copy()
-
-    df = df[~df["ФИО"].apply(is_nonperson)].copy()
-
-    return df
-
-
-# ===================== ЧТЕНИЕ КАДРОВОГО ФАЙЛА =====================
-
-def read_kadry(file_obj) -> pd.DataFrame:
-    """
-    Читаем кадровый файл и разворачиваем интервалы в посуточный список.
-    Ожидаем колонки: 'Сотрудник', 'Вид отсутствия', 'с', 'до'.
-    """
-    kadry = pd.read_excel(file_obj, header=None)
-
-    # ищем строку, где в любой колонке есть 'Сотрудник'
-    def _is_sotr_cell(x):
-        s = "" if pd.isna(x) else str(x)
-        return s.strip().casefold() == "сотрудник"
-
-    mask_rows = kadry.apply(lambda row: row.map(_is_sotr_cell).any(), axis=1)
-    idxs = kadry.index[mask_rows]
-    if len(idxs) == 0:
-        raise RuntimeError(
-            "Не удалось найти строку с заголовком 'Сотрудник' в кадровом файле."
-        )
-
-    hdr_row = idxs[0]
-    kadry.columns = kadry.iloc[hdr_row]
-    kadry = kadry.iloc[hdr_row + 1 :]
-
-    kadry = kadry.rename(
-        columns={
-            "Сотрудник": "ФИО",
-            "Вид отсутствия": "Тип",
-            "с": "Дата_с",
-            "до": "Дата_по",
-        }
-    )
-    kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
-    kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
-
-    # умный разбор дат
-    for col in ["Дата_с", "Дата_по"]:
-        kadry[col] = kadry[col].apply(smart_parse_date)
-
-    kadry["Дата_по"] = kadry["Дата_по"].fillna(kadry["Дата_с"])
-
-    rows = []
-    for _, r in kadry.iterrows():
-        d1, d2 = r["Дата_с"], r["Дата_по"]
-        if pd.isna(d1) or pd.isna(d2):
-            continue
-        for d in pd.date_range(d1, d2, freq="D"):
-            rows.append({"ФИО": r["ФИО"], "Дата": d.date(), "Тип": r["Тип"]})
-
-    kadry_dates = pd.DataFrame(rows)
-
-    # замена «гос. обязанности» -> «Сдача крови»
-    kadry_dates["Тип"] = kadry_dates["Тип"].replace(
-        to_replace=r"(?i).*гос.*обязан.*", value="Сдача крови", regex=True
-    )
-
-    return kadry_dates
-
-
-# --- Доп. логика: опоздания и выходы ---
+# --- Доп. логика: опоздания, длительность, выходы и suspect ---
 
 def _core_window_for_day(day):
     base = pd.Timestamp(day).normalize()
@@ -569,12 +571,11 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     Главная функция: получает файл журнала и, при наличии, кадровый файл.
     Возвращает готовый pandas.DataFrame для выгрузки в Excel.
-    Логика по ИТОГО ЗА ДЕНЬ и ИТОГО ЗА НЕДЕЛЮ максимально близка к Колабу.
     """
-    # читаем журнал
+    # 1) читаем журнал
     df = read_journal(journal_file)
 
-    # автоматически выбираем колонку для направлений ('Вход' или 'Выход')
+    # 2) автоматически выбираем колонку для направлений ('Вход' или 'Выход')
     def _total_outside(col):
         t = compute_outside_table(df, col)
         return pd.to_numeric(t["Вне_ядра_мин"], errors="coerce").fillna(0).sum()
@@ -583,112 +584,101 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     sum_entry = _total_outside("Вход")
     right_col = "Вход" if sum_entry <= sum_exit else "Выход"
 
-    # пересчитываем окончательную таблицу «Вне офиса» по выбранной колонке
+    # 3) таблица "Вне офиса"
     out_df = compute_outside_table(df, right_col)
 
-    # считаем групповые статистики (опоздание, длительность, first/last)
+    # 4) длительность, опоздания
     stats_df = _calc_group_stats(df)
 
-    # считаем выходы
+    # 5) выходы и suspect
     exits_df = _calc_exits_and_suspect(df, right_col)
 
-    # мержим всё по ФИО + Дата
-    merged = out_df.merge(
-        stats_df[["ФИО", "Дата", "Продолжительность_мин", "Опоздание", "Общее время"]],
+    # 6) объединяем
+    final = out_df.merge(
+        stats_df[["ФИО", "Дата", "Продолжительность_мин", "Общее время", "Опоздание"]],
+        on=["ФИО", "Дата"],
+        how="left",
+    )
+    final = final.merge(
+        exits_df[["ФИО", "Дата", "Выходы", "suspect"]],
         on=["ФИО", "Дата"],
         how="left",
     )
 
-    merged = merged.merge(
-        exits_df[["ФИО", "Дата", "Выходы"]],
-        on=["ФИО", "Дата"],
-        how="left",
+    final["Выходы"] = final["Выходы"].fillna(0).astype(int)
+    final["suspect"] = final["suspect"].fillna(False)
+
+    # дописываем пометку "возм. проход вне терминала"
+    mask_susp = final["suspect"] == True
+    final.loc[mask_susp, "Вне офиса"] = (
+        final.loc[mask_susp, "Вне офиса"].astype(str)
+        + "\nвозм. проход вне терминала"
     )
 
-    merged["Выходы"] = merged["Выходы"].fillna(0).astype(int)
+    # === 7) ИТОГО ЗА ДЕНЬ (колаб-логика, упрощённая) ===
+    # span = первый→последний проход (у нас это Продолжительность_мин)
+    span = pd.to_numeric(final["Продолжительность_мин"], errors="coerce").fillna(0).astype(int)
+    outside = pd.to_numeric(final["Вне_ядра_мин"], errors="coerce").fillna(0).astype(int)
 
-    # === Шаг 1. ИТОГО ЗА ДЕНЬ (формула как в Колабе, без 4-часовых персонально) ===
-    merged["Продолжительность_мин"] = pd.to_numeric(
-        merged["Продолжительность_мин"], errors="coerce"
-    ).fillna(0).astype(int)
+    small = span < 60  # совсем короткая смена — не трогаем
+    lunch = (~small).astype(int) * 60                # фикс-обед 60 мин, если смена ≥ 60
+    penalty = (~small).astype(int) * (outside - 60).clip(lower=0)  # штраф за вне ядра > 60 мин
 
-    merged["Вне_ядра_мин"] = pd.to_numeric(
-        merged["Вне_ядра_мин"], errors="coerce"
-    ).fillna(0).astype(int)
+    final["Итого_дня_мин"] = (span - lunch - penalty).clip(lower=0).astype(int)
+    final["Итого за день"] = final["Итого_дня_мин"].apply(fmt_hm)
 
-    # маленькие смены (< 60 минут) — ничего не считаем
-    small = merged["Продолжительность_мин"] < 60
+    # Недоработки как max(0, вне_ядра - 60)
+    ned_min = (outside - 60).clip(lower=0).astype(int)
+    final["Недоработки"] = ned_min.apply(fmt_hm)
 
-    # обед: если смена < 60 мин → 0; иначе 60 минут
-    lunch = (~small) * 60
-    lunch = lunch.astype(int)
+    # === 8) ИТОГО ЗА НЕДЕЛЮ — только в последний рабочий день недели ===
+    final["Дата_dt"] = pd.to_datetime(final["Дата"], errors="coerce")
+    final["week_monday"] = final["Дата_dt"] - pd.to_timedelta(
+        final["Дата_dt"].dt.weekday, unit="D"
+    )
 
-    # буфер "вне ядра": всегда 60 минут (как для обычных сотрудников в Колабе)
-    buf = 60
+    final["Итого_нед_мин"] = 0
+    final["Итого за неделю"] = ""
 
-    # штраф за "вне ядра": если смена < 60 мин → 0; иначе max(0, вне_ядра - буфер)
-    penalty_base = merged["Вне_ядра_мин"] - buf
-    penalty_out = penalty_base.where(~small, 0)
-    penalty_out = penalty_out.clip(lower=0).astype(int)
-
-    merged["Итого_дня_мин"] = (
-        merged["Продолжительность_мин"] - lunch - penalty_out
-    ).clip(lower=0).astype(int)
-
-    merged["Итого за день"] = merged["Итого_дня_мин"].apply(fmt_hm)
-
-    # Недоработки = max(0, вне_ядра - буфер)
-    need_min = (merged["Вне_ядра_мин"] - buf).clip(lower=0).astype(int)
-    merged["Недоработки"] = need_min.apply(fmt_hm)
-
-    # === Шаг 2. ИТОГО ЗА НЕДЕЛЮ (ТОЛЬКО в последний рабочий день недели) ===
-    merged["Дата_dt"] = pd.to_datetime(merged["Дата"], errors="coerce")
-    merged = merged.sort_values(["ФИО", "Дата_dt"])
-
-    merged["Итого за неделю"] = ""
-    merged["Итого_нед_мин"] = 0
-
-    # неделя с понедельника
-    merged["Неделя"] = merged["Дата_dt"].dt.to_period("W-MON")
-
-    for (fio, week), sub in merged.groupby(["ФИО", "Неделя"], sort=False):
-        eff = sub["Итого_дня_мин"].fillna(0).astype(int).sum()
-        if eff <= 0:
+    for (fio, wmo), sub in final.groupby(["ФИО", "week_monday"], sort=False):
+        week_sum = int(sub["Итого_дня_мин"].sum())
+        if week_sum <= 0:
             continue
-        last_idx = sub.index[-1]
-        merged.at[last_idx, "Итого за неделю"] = fmt_hm(eff)
-        merged.at[last_idx, "Итого_нед_мин"] = int(eff)
+        # последний рабочий день в этой группе (обычно пятница)
+        last_idx = sub["Дата_dt"].idxmax()
+        final.loc[last_idx, "Итого_нед_мин"] = week_sum
+        final.loc[last_idx, "Итого за неделю"] = fmt_hm(week_sum)
 
-    # === Кадровые данные (причины отсутствия) ===
+    final = final.drop(columns=["Дата_dt", "week_monday", "suspect"], errors="ignore")
+
+    # === 9) ПРИЧИНА ОТСУТСТВИЯ (кадровый файл) ===
     if kadry_file is None:
-        merged["Причина отсутствия"] = ""
+        final["Причина отсутствия"] = ""
     else:
         kadry_dates = read_kadry(kadry_file)
 
-        # ключи ФИО и даты
-        merged["ФИО_key"] = merged["ФИО"].apply(fio_match_key)
+        # ключи ФИО + даты через fio_match_key
+        final["ФИО_key"] = final["ФИО"].apply(fio_match_key)
         kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
 
-        merged["Дата_key"] = pd.to_datetime(merged["Дата_dt"], errors="coerce").dt.date
+        final["Дата_key"] = pd.to_datetime(
+            final["Дата"], errors="coerce"
+        ).dt.date
         kadry_dates["Дата_key"] = pd.to_datetime(
             kadry_dates["Дата"], errors="coerce"
         ).dt.date
 
-        merged = merged.merge(
+        final = final.merge(
             kadry_dates[["ФИО_key", "Дата_key", "Тип"]],
             on=["ФИО_key", "Дата_key"],
             how="left",
         )
+        final["Причина отсутствия"] = final["Тип"]
+        final = final.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
 
-        merged["Причина отсутствия"] = merged["Тип"]
-        merged = merged.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
+    # === 10) Формат даты и порядок колонок ===
+    final["Дата"] = pd.to_datetime(final["Дата"], errors="coerce").dt.strftime("%d-%m-%Y")
 
-    # форматируем дату дд-мм-гггг
-    merged["Дата"] = pd.to_datetime(merged["Дата_dt"], errors="coerce").dt.strftime(
-        "%d-%m-%Y"
-    )
-
-    # окончательный порядок колонок
     cols_order = [
         "ФИО",
         "Дата",
@@ -708,13 +698,9 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         "Итого_нед_мин",
     ]
     for c in cols_order:
-        if c not in merged.columns:
-            # для служебных мин.колонок — 0, для остальных — пустая строка
-            if c in ("Итого_дня_мин", "Итого_нед_мин", "Вне_ядра_мин"):
-                merged[c] = 0
-            else:
-                merged[c] = ""
+        if c not in final.columns:
+            final[c] = ""  # на всякий случай
 
-    final = merged[cols_order].copy()
+    final = final[cols_order]
 
     return final
