@@ -615,8 +615,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         + "\nвозм. проход вне терминала"
     )
 
-    # === 7) ИТОГО ЗА ДЕНЬ (колаб-логика, упрощённая) ===
-    # span = первый→последний проход (у нас это Продолжительность_мин)
+    # === 7) ИТОГО ЗА ДЕНЬ (логика: span - обед - штраф за вне ядра) ===
     span = pd.to_numeric(final["Продолжительность_мин"], errors="coerce").fillna(0).astype(int)
     outside = pd.to_numeric(final["Вне_ядра_мин"], errors="coerce").fillna(0).astype(int)
 
