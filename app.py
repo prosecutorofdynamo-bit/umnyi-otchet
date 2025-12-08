@@ -137,7 +137,7 @@ st.markdown(
 import base64
 import os
 
-st.header("📂 Пример загрузужаемых файлов")
+st.header("📂 Пример загружаемых файлов")
 
 def download_file(path, label):
     with open(path, "rb") as f:
@@ -403,6 +403,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
