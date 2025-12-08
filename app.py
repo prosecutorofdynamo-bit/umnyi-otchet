@@ -133,6 +133,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---------------- ПРИМЕРЫ ФАЙЛОВ ----------------
+import base64
+import os
+
+st.header("📂 Пример входных файлов")
+
+def download_file(path, label):
+    with open(path, "rb") as f:
+        data = f.read()
+    b64 = base64.b64encode(data).decode()
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(path)}">{label}</a>'
+    st.markdown(href, unsafe_allow_html=True)
+
+col_example1, col_example2 = st.columns(2)
+
+with col_example1:
+    download_file("examples/Ноябрь пример.xlsx", "⬇ Скачать пример отчёта СКУД")
+
+with col_example2:
+    download_file("examples/ноябрь кадры.xlsx", "⬇ Скачать пример кадрового файла")
+
+st.markdown("---")
+
 # --- Шаг 1. Загрузка файлов ---
 st.header("Шаг 1. Загрузка файлов")
 
@@ -380,4 +403,5 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
