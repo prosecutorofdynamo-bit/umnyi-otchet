@@ -149,10 +149,10 @@ def download_file(path, label):
 col_example1, col_example2 = st.columns(2)
 
 with col_example1:
-    download_file("examples/Ноябрь пример.xlsx", "⬇ Скачать пример отчёта пропусков (СКУД)")
+    download_file("examples/пример СКУД.xlsx", "⬇ Скачать пример отчёта пропусков (СКУД)")
 
 with col_example2:
-    download_file("examples/ноябрь кадры.xlsx", "⬇ Скачать пример кадрового файла")
+    download_file("examples/пример от кадров.xlsx", "⬇ Скачать пример кадрового файла")
 
 st.markdown("---")
 
@@ -403,6 +403,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
