@@ -382,24 +382,24 @@ if st.button("🚀 Обработать данные"):
             st.code(repr(e))
         else:
             if not allowed:
-    st.markdown(
-        """
-        <div style="
-            background-color: #ffffff; 
-            border-left: 6px solid #E53935; 
-            border: 1px solid #e0e0e0; 
-            padding: 15px 18px; 
-            border-radius: 6px;
-            color: #b71c1c;
-            font-size: 16px;
-        ">
-            <b>⛔ Бесплатный лимит использован.</b><br>
-            Чтобы получить дополнительный доступ — напишите нам, и мы подключим расширенный режим.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.stop()
+        st.markdown(
+            """
+            <div style="
+                background-color: #ffffff; 
+                border-left: 6px solid #E53935; 
+                border: 1px solid #e0e0e0; 
+                padding: 15px 18px; 
+                border-radius: 6px;
+                color: #b71c1c;
+                font-size: 16px;
+            ">
+                <b>⛔ Бесплатный лимит использован.</b><br>
+                Чтобы получить дополнительный доступ — напишите нам, и мы подключим расширенный режим.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 # ---------------- ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА ----------------
 st.header("Шаг 3. Выгрузка отчёта")
@@ -518,6 +518,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
