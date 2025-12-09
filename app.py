@@ -5,74 +5,29 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 
-# --------- ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
-import gspread
-from google.oauth2.service_account import Credentials
-
-# ID твоей таблицы (кусок из URL между /d/ и /edit)
-SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
-
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-# Используем локальный файл gcp_service_key.json из репозитория
-creds = Credentials.from_service_account_file(
-    "gcp_service_key.json",
-    scopes=SCOPES,
-)
-
-try:
-    gs_client = gspread.authorize(creds)
-    sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
-except Exception as e:
-    st.error("Ошибка при подключении к Google Sheets:")
-    st.code(repr(e))
-    st.stop()
-# --------- /ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
-
 def register_client_run(client_id: str, max_free_runs: int = 1):
     """
-    Регистрирует запуск клиента в Google Sheets.
+    Ограничение запусков внутри одной сессии браузера.
+    Для каждого client_id даём max_free_runs бесплатных запусков.
+    Данные хранятся в st.session_state и сбрасываются при очистке куков / новом браузере.
     Возвращает (allowed: bool, free_left: int).
-
-    max_free_runs — сколько бесплатных запусков даём новому клиенту.
     """
-    # читаем все строки как словари
-    records = sheet.get_all_records()  # [{'client_id': ..., 'free_runs_left': ...}, ...]
+    # берём словарь запусков из session_state
+    runs = st.session_state.setdefault("run_counts", {})
 
-    # ищем клиента в уже существующих строках
-    for idx, row in enumerate(records, start=2):  # данные начинаются со 2-й строки (1 — заголовки)
-        if row.get("client_id") == client_id:
-            free_left = int(row.get("free_runs_left") or 0)
-            total_runs = int(row.get("total_runs") or 0)
+    used = runs.get(client_id, 0)
 
-            # если бесплатных запусков не осталось — блокируем
-            if free_left <= 0:
-                return False, free_left
+    # если уже исчерпал лимит — блокируем
+    if used >= max_free_runs:
+        return False, 0
 
-            # уменьшаем оставшиеся, увеличиваем общее число запусков
-            free_left -= 1
-            total_runs += 1
+    # увеличиваем число использованных запусков
+    used += 1
+    runs[client_id] = used
 
-            # обновляем ячейки в таблице
-            sheet.update_cell(idx, 2, free_left)  # колонка B: free_runs_left
-            sheet.update_cell(idx, 3, total_runs)  # колонка C: total_runs
-            sheet.update_cell(idx, 4, pd.Timestamp.utcnow().isoformat())  # колонка D: last_run
-
-            return True, free_left
-
-    # если клиента не нашли — создаём новую строку
-    free_left = max_free_runs - 1
-    total_runs = 1
-    sheet.append_row(
-        [
-            client_id,
-            free_left,
-            total_runs,
-            pd.Timestamp.utcnow().isoformat(),
-        ]
-    )
-
+    free_left = max_free_runs - used
     return True, free_left
+
 # --------- /ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
@@ -506,6 +461,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
