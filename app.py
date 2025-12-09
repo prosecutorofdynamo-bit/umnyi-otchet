@@ -5,6 +5,71 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 
+# --------- ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
+import gspread
+from google.oauth2.service_account import Credentials
+
+# ID твоей таблицы (кусок из URL между /d/ и /edit)
+SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
+
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+# Используем сервисный аккаунт и ключ gcp_service_key.json
+creds = Credentials.from_service_account_file(
+    "gcp_service_key.json",
+    scopes=SCOPES,
+)
+
+gs_client = gspread.authorize(creds)
+sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
+
+
+def register_client_run(client_id: str, max_free_runs: int = 1):
+    """
+    Регистрирует запуск клиента в Google Sheets.
+    Возвращает (allowed: bool, free_left: int).
+
+    max_free_runs — сколько бесплатных запусков даём новому клиенту.
+    """
+    # читаем все строки как словари
+    records = sheet.get_all_records()  # [{'client_id': ..., 'free_runs_left': ...}, ...]
+
+    # ищем клиента в уже существующих строках
+    for idx, row in enumerate(records, start=2):  # данные начинаются со 2-й строки (1 — заголовки)
+        if row.get("client_id") == client_id:
+            free_left = int(row.get("free_runs_left") or 0)
+            total_runs = int(row.get("total_runs") or 0)
+
+            # если бесплатных запусков не осталось — блокируем
+            if free_left <= 0:
+                return False, free_left
+
+            # уменьшаем оставшиеся, увеличиваем общее число запусков
+            free_left -= 1
+            total_runs += 1
+
+            # обновляем ячейки в таблице
+            sheet.update_cell(idx, 2, free_left)  # колонка B: free_runs_left
+            sheet.update_cell(idx, 3, total_runs)  # колонка C: total_runs
+            sheet.update_cell(idx, 4, pd.Timestamp.utcnow().isoformat())  # колонка D: last_run
+
+            return True, free_left
+
+    # если клиента не нашли — создаём новую строку
+    free_left = max_free_runs - 1
+    total_runs = 1
+    sheet.append_row(
+        [
+            client_id,
+            free_left,
+            total_runs,
+            pd.Timestamp.utcnow().isoformat(),
+        ]
+    )
+
+    return True, free_left
+# --------- /ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
+
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
     page_title="Умный отчет",
@@ -271,16 +336,49 @@ else:
 
 # ---------------- ШАГ 2. ОБРАБОТКА ДАННЫХ ----------------
 st.header("Шаг 2. Обработка данных")
+# Идентификатор клиента (email или Telegram)
+st.subheader("Кто запускает отчёт?")
+
+client_id = st.text_input(
+    "Укажите ваш email или Telegram (@username)",
+    help="Это нужно, чтобы дать вам 1 бесплатный запуск и учитывать дальнейшие обращения.",
+)
+
+st.caption(
+    "Мы не рассылаем спам. Идентификатор используется только для учёта запусков и поддержки."
+)
 
 final_df = None
 
 if st.button("🚀 Обработать данные"):
-    try:
-        final_df = build_report(file_journal, kadry_file)
-    except Exception as e:
-        st.error(f"❌ Ошибка при обработке данных: {e}")
+    # 1. Проверяем, что клиент указал идентификатор
+    clean_client_id = (client_id or "").strip()
+    if not clean_client_id:
+        st.warning("Сначала укажите ваш email или Telegram выше.")
     else:
-        st.success("✅ Обработка завершена.")
+        # 2. Пытаемся зарегистрировать запуск в Google Sheets
+        try:
+            allowed, free_left = register_client_run(clean_client_id)
+        except Exception as e:
+            st.error(f"❌ Не удалось связаться с системой учёта запусков: {e}")
+        else:
+            if not allowed:
+                st.error(
+                    "😔 Похоже, бесплатные запуски для этого идентификатора закончились.\n\n"
+                    "Напишите, пожалуйста, автору сервиса, чтобы подключить платный доступ "
+                    "или выдать дополнительные тестовые запуски."
+                )
+            else:
+                # 3. Разрешено — запускаем обработку
+                try:
+                    final_df = build_report(file_journal, kadry_file)
+                except Exception as e:
+                    st.error(f"❌ Ошибка при обработке данных: {e}")
+                else:
+                    st.success(
+                        f"✅ Обработка завершена. "
+                        f"Осталось бесплатных запусков: {free_left}."
+                    )
 
 # Если ещё не нажали кнопку или произошла ошибка — дальше не идём
 if final_df is None:
@@ -403,6 +501,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
