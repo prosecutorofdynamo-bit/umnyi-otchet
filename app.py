@@ -3,6 +3,7 @@ import pandas as pd
 import io
 import base64
 import os
+import json  # ← обязательно здесь!
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
@@ -521,6 +522,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
