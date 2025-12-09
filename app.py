@@ -3,7 +3,6 @@ import pandas as pd
 import io
 import base64
 import os
-import json
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
@@ -15,30 +14,19 @@ from google.oauth2.service_account import Credentials
 SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# пробуем оба варианта имени секрета: gcp_service_key и GCP_SERVICE_KEY
 try:
-    raw = st.secrets["gcp_service_key"]
-except KeyError:
-    raw = st.secrets["GCP_SERVICE_KEY"]
-
-# raw может быть строкой (JSON) или уже словарём
-if isinstance(raw, str):
-    service_info = json.loads(raw)
-else:
-    service_info = dict(raw)
-
-creds = Credentials.from_service_account_info(
-    service_info,
-    scopes=SCOPES,
-)
-
-try:
+    creds = Credentials.from_service_account_file(
+        "gcp_service_key.json",
+        scopes=SCOPES,
+    )
     gs_client = gspread.authorize(creds)
     sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист
 except Exception as e:
     st.error("Ошибка при подключении к Google Sheets:")
     st.code(repr(e))
     st.stop()
+# --------- /УЧЁТ КЛИЕНТОВ В GOOGLE SHEETS ---------
+
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
 def register_client_run(client_id: str, max_free_runs: int = 1):
@@ -530,5 +518,6 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
