@@ -15,13 +15,16 @@ SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Берём JSON-ключ из Streamlit Secrets
-service_key_json = st.secrets["GCP_SERVICE_KEY"]
+# Берём данные сервисного аккаунта как словарь из secrets
+service_info = dict(st.secrets["GCP_SERVICE_KEY"])
 
 creds = Credentials.from_service_account_info(
-    json.loads(service_key_json),
+    service_info,
     scopes=SCOPES,
 )
+
+gs_client = gspread.authorize(creds)
+sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
 
 gs_client = gspread.authorize(creds)
 sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
@@ -503,6 +506,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
