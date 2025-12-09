@@ -5,6 +5,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 
+
 def register_client_run(client_id: str, max_free_runs: int = 1):
     """
     Ограничение запусков внутри одной сессии браузера.
@@ -12,23 +13,17 @@ def register_client_run(client_id: str, max_free_runs: int = 1):
     Данные хранятся в st.session_state и сбрасываются при очистке куков / новом браузере.
     Возвращает (allowed: bool, free_left: int).
     """
-    # берём словарь запусков из session_state
     runs = st.session_state.setdefault("run_counts", {})
-
     used = runs.get(client_id, 0)
 
-    # если уже исчерпал лимит — блокируем
     if used >= max_free_runs:
         return False, 0
 
-    # увеличиваем число использованных запусков
     used += 1
     runs[client_id] = used
-
     free_left = max_free_runs - used
     return True, free_left
 
-# --------- /ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -136,9 +131,6 @@ st.markdown(
         background-color: #ffffff !important;
         color: #102A43 !important;
     }
-    </style>
-    """,
-    unsafe_allow_html=True
 
     /* === ПОЛЕ ВВОДА E-MAIL / TELEGRAM === */
     .stTextInput > div > div > input {
@@ -148,7 +140,9 @@ st.markdown(
         border-radius: 6px !important;
         padding: 8px 10px !important;
     }
-
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
@@ -174,12 +168,17 @@ import os
 
 st.header("📂 Пример загружаемых файлов")
 
+
 def download_file(path, label):
     with open(path, "rb") as f:
         data = f.read()
     b64 = base64.b64encode(data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(path)}">{label}</a>'
+    href = (
+        f'<a href="data:application/octet-stream;base64,{b64}" '
+        f'download="{os.path.basename(path)}">{label}</a>'
+    )
     st.markdown(href, unsafe_allow_html=True)
+
 
 col_example1, col_example2 = st.columns(2)
 
@@ -322,12 +321,10 @@ st.caption(
 final_df = None
 
 if st.button("🚀 Обработать данные"):
-    # 1. Проверяем, что клиент указал идентификатор
     clean_client_id = (client_id or "").strip()
     if not clean_client_id:
         st.warning("Сначала укажите ваш e-mail или ник в Telegram выше.")
     else:
-        # 2. Проверяем лимит запусков в этой сессии
         allowed, free_left = register_client_run(clean_client_id)
 
         if not allowed:
@@ -337,7 +334,6 @@ if st.button("🚀 Обработать данные"):
                 "или выдать дополнительные тестовые запуски."
             )
         else:
-            # 3. Разрешено — запускаем обработку
             try:
                 final_df = build_report(file_journal, kadry_file)
             except Exception as e:
@@ -353,7 +349,6 @@ if final_df is None:
 # ---------------- ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА ----------------
 st.header("Шаг 3. Выгрузка отчёта")
 
-# Базовый набор колонок
 visible_cols = [
     "ФИО",
     "Дата",
@@ -378,7 +373,6 @@ if not visible_cols:
 else:
     final_view = final_df[visible_cols].copy()
 
-# Сортировка по ФИО и дате (если возможно)
 if "ФИО" in final_view.columns and "Дата" in final_view.columns:
     final_view = final_view.sort_values(["ФИО", "Дата"])
 
@@ -387,7 +381,6 @@ buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
     sheet_name = "Журнал"
 
-    # пишем таблицу с отступом (чтобы сверху уместить заголовок)
     final_view.to_excel(writer, index=False, sheet_name=sheet_name, startrow=3)
 
     wb = writer.book
@@ -467,6 +460,8 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
+
 
 
 
