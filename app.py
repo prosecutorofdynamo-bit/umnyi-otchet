@@ -324,8 +324,23 @@ if kadry_file is None:
         "или сразу перейти к обработке."
     )
 else:
-    st.success("✅ Оба файла загружены!")
-
+    st.markdown(
+        """
+        <div style="
+            background-color: #F5F9FF;
+            border-left: 5px solid #1E88E5;
+            border: 1px solid #D6E4FF;
+            padding: 12px 16px;
+            border-radius: 6px;
+            color: #003366;
+            font-size: 15px;
+            margin-top: 10px;
+        ">
+            <b>✅ Оба файла загружены!</b>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 # Красивый вывод названий файлов
 st.markdown(
     f"<div class='file-label'>📘 Журнал: {file_journal.name}</div>",
@@ -541,6 +556,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
