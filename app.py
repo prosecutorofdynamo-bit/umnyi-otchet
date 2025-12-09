@@ -3,12 +3,10 @@ import pandas as pd
 import io
 import base64
 import os
-import json  # ← обязательно здесь!
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 
-# --------- УЧЁТ КЛИЕНТОВ В GOOGLE SHEETS ---------
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -16,15 +14,15 @@ SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 try:
-    # Берём JSON-строку из secrets и парсим её как словарь
-    service_info = json.loads(st.secrets["GOOGLE_SERVICE_KEY"])
+    raw = st.secrets["GOOGLE_SERVICE_KEY"]
+    service_info = json.loads(raw)
 
     creds = Credentials.from_service_account_info(
         service_info,
         scopes=SCOPES,
     )
     gs_client = gspread.authorize(creds)
-    sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист
+    sheet = gs_client.open_by_key(SHEET_ID).sheet1
 except Exception as e:
     st.error("Ошибка при подключении к Google Sheets:")
     st.code(repr(e))
@@ -522,6 +520,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
