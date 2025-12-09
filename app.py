@@ -14,13 +14,20 @@ from google.oauth2.service_account import Credentials
 SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-creds = Credentials.from_service_account_file(
-    "gcp_service_key.json",
+# берём ключ из secrets
+creds = Credentials.from_service_account_info(
+    dict(st.secrets["gcp_service_key"]),
     scopes=SCOPES,
 )
 
-gs_client = gspread.authorize(creds)
-sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист
+try:
+    gs_client = gspread.authorize(creds)
+    sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист
+except Exception as e:
+    st.error("Ошибка при подключении к Google Sheets:")
+    st.code(repr(e))
+    st.stop()
+# -----------------------------------------------
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
 def register_client_run(client_id: str, max_free_runs: int = 1):
@@ -512,3 +519,4 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
