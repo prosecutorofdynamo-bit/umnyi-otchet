@@ -15,8 +15,11 @@ SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 try:
-    creds = Credentials.from_service_account_file(
-        "gcp_service_key.json",
+    # Берём JSON-строку из secrets и парсим её как словарь
+    service_info = json.loads(st.secrets["GOOGLE_SERVICE_KEY"])
+
+    creds = Credentials.from_service_account_info(
+        service_info,
         scopes=SCOPES,
     )
     gs_client = gspread.authorize(creds)
@@ -518,6 +521,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
