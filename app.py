@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import json   # <-- добавили
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
@@ -14,15 +15,16 @@ SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Используем сервисный аккаунт и ключ gcp_service_key.json
-creds = Credentials.from_service_account_file(
-    "gcp_service_key.json",
+# Берём JSON-ключ из Streamlit Secrets
+service_key_json = st.secrets["GCP_SERVICE_KEY"]
+
+creds = Credentials.from_service_account_info(
+    json.loads(service_key_json),
     scopes=SCOPES,
 )
 
 gs_client = gspread.authorize(creds)
 sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
-
 
 def register_client_run(client_id: str, max_free_runs: int = 1):
     """
@@ -501,6 +503,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
