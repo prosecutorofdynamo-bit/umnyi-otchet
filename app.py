@@ -7,30 +7,64 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 
+# --------- УЧЁТ КЛИЕНТОВ В GOOGLE SHEETS ---------
+import gspread
+from google.oauth2.service_account import Credentials
+
+SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+creds = Credentials.from_service_account_file(
+    "gcp_service_key.json",
+    scopes=SCOPES,
+)
+
+gs_client = gspread.authorize(creds)
+sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
 def register_client_run(client_id: str, max_free_runs: int = 1):
     """
-    Ограничение запусков внутри одной сессии браузера.
+    Учёт запусков в Google Sheets.
     Для каждого client_id даём max_free_runs бесплатных запусков.
-    Данные хранятся в st.session_state и сбрасываются при очистке куков / новом браузере.
     Возвращает (allowed: bool, free_left: int).
     """
-    runs = st.session_state.setdefault("run_counts", {})
-    used = runs.get(client_id, 0)
+    records = sheet.get_all_records()  # [{'client_id': ..., 'free_runs_left': ..., ...}, ...]
 
-    # если уже исчерпал лимит — блокируем
-    if used >= max_free_runs:
-        return False, 0
+    # Ищем клиента в уже существующих строках
+    for idx, row in enumerate(records, start=2):  # данные со 2-й строки (1 — заголовки)
+        if row.get("client_id") == client_id:
+            free_left = int(row.get("free_runs_left") or 0)
+            total_runs = int(row.get("total_runs") or 0)
 
-    # увеличиваем число использованных запусков
-    used += 1
-    runs[client_id] = used
+            # Лимит исчерпан — блокируем
+            if free_left <= 0:
+                return False, 0
 
-    free_left = max_free_runs - used
+            # Иначе уменьшаем остаток и увеличиваем total_runs
+            free_left -= 1
+            total_runs += 1
+
+            sheet.update_cell(idx, 2, free_left)  # B: free_runs_left
+            sheet.update_cell(idx, 3, total_runs)  # C: total_runs
+            sheet.update_cell(idx, 4, pd.Timestamp.utcnow().isoformat())  # D: last_run
+
+            return True, free_left
+
+    # Если клиента нет — создаём новую строку
+    free_left = max_free_runs - 1
+    total_runs = 1
+
+    sheet.append_row(
+        [
+            client_id,
+            free_left,
+            total_runs,
+            pd.Timestamp.utcnow().isoformat(),
+        ]
+    )
+
     return True, free_left
-# -----------------------------------------------
-
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -305,12 +339,12 @@ else:
 # ---------------- ШАГ 2. ОБРАБОТКА ДАННЫХ ----------------
 st.header("Шаг 2. Обработка данных")
 
-st.subheader("Контакты для бесплатной выгрузки")
+st.subheader("Для одного бесплатного анализа укажите свои данные")
 
 st.markdown(
     """
     Первый отчёт можно сформировать бесплатно.<br>
-    Укажите ваши контакты — это поможет восстановить доступ и ответить на вопросы.
+    Напишите электронную почту или ник в Telegram — это поможет восстановить доступ и ответить на вопросы.
     """,
     unsafe_allow_html=True,
 )
@@ -332,23 +366,30 @@ if st.button("🚀 Обработать данные"):
     if not clean_client_id:
         st.warning("Сначала укажите ваш e-mail или ник в Telegram выше.")
     else:
-        # Проверяем лимит запусков в этой сессии браузера
-        allowed, free_left = register_client_run(clean_client_id)
-
-        if not allowed:
-            st.error(
-                "😔 Бесплатные запуски для этого браузера и указанного идентификатора закончились.\n\n"
-                "Напишите, пожалуйста, автору сервиса, чтобы подключить платный доступ "
-                "или выдать дополнительные тестовые запуски."
-            )
+        # Проверяем лимит запусков по контактам в Google Sheets
+        try:
+            allowed, free_left = register_client_run(clean_client_id)
+        except Exception as e:
+            st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
+            st.code(repr(e))
         else:
-            try:
-                final_df = build_report(file_journal, kadry_file)
-            except Exception as e:
-                st.error(f"❌ Ошибка при обработке данных: {e}")
+            if not allowed:
+                st.error(
+                    "😔 Бесплатные запуски для этого контакта уже использованы.\n\n"
+                    "Напишите, пожалуйста, автору сервиса, чтобы подключить платный доступ "
+                    "или выдать дополнительные тестовые запуски."
+                )
             else:
-                st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
-                st.info(f"Для этого браузера осталось бесплатных запусков: **{free_left}**.")
+                try:
+                    final_df = build_report(file_journal, kadry_file)
+                except Exception as e:
+                    st.error(f"❌ Ошибка при обработке данных: {e}")
+                else:
+                    st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
+                    if free_left > 0:
+                        st.info(f"Осталось бесплатных запусков по этому контакту: {free_left}.")
+                    else:
+                        st.info("Бесплатных запусков по этому контакту больше не осталось.")
 
 # Если ещё не нажали кнопку или произошла ошибка — дальше не идём
 if final_df is None:
