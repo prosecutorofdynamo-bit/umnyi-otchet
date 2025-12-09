@@ -20,8 +20,13 @@ creds = Credentials.from_service_account_file(
     scopes=SCOPES,
 )
 
-gs_client = gspread.authorize(creds)
-sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
+try:
+    gs_client = gspread.authorize(creds)
+    sheet = gs_client.open_by_key(SHEET_ID).sheet1  # первый лист таблицы
+except Exception as e:
+    st.error("Ошибка при подключении к Google Sheets:")
+    st.code(repr(e))
+    st.stop()
 # --------- /ДОБАВЛЕНО ДЛЯ GOOGLE SHEETS ---------
 
 def register_client_run(client_id: str, max_free_runs: int = 1):
@@ -501,6 +506,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
