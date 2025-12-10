@@ -5,6 +5,11 @@ import base64
 import os
 import json
 import re
+import smtplib
+import ssl
+import secrets as py_secrets
+import string
+
 
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
@@ -55,6 +60,46 @@ except Exception as e:
     st.code(repr(e))
     st.stop()
 
+# --------- SMTP ДЛЯ ОТПРАВКИ КОДА НА ПОЧТУ ---------
+EMAIL_HOST = st.secrets.get("EMAIL_HOST", "smtp.yandex.ru")
+EMAIL_PORT = int(st.secrets.get("EMAIL_PORT", 465))
+EMAIL_USER = st.secrets.get("EMAIL_USER")
+EMAIL_PASSWORD = st.secrets.get("EMAIL_PASSWORD")
+# --------- /SMTP ДЛЯ ОТПРАВКИ КОДА НА ПОЧТУ ---------
+
+def generate_code(length: int = 6) -> str:
+    """Генерирует цифровой код подтверждения, например '492731'."""
+    digits = string.digits
+    return "".join(py_secrets.choice(digits) for _ in range(length))
+
+
+def send_verification_code(email: str, code: str) -> None:
+    """
+    Отправка кода подтверждения на почту через SMTP (Яндекс).
+    Предполагается, что EMAIL_USER/EMAIL_PASSWORD заданы в secrets.
+    """
+    if not EMAIL_USER or not EMAIL_PASSWORD:
+        raise RuntimeError("SMTP учётные данные не заданы в secrets")
+
+    subject = "Код подтверждения для умного отчёта"
+    body = (
+        f"Ваш код подтверждения: {code}\n\n"
+        f"Если вы не запрашивали код, просто игнорируйте это письмо."
+    )
+
+    message = (
+        f"From: {EMAIL_USER}\r\n"
+        f"To: {email}\r\n"
+        f"Subject: {subject}\r\n"
+        f"Content-Type: text/plain; charset=utf-8\r\n"
+        f"\r\n"
+        f"{body}"
+    )
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
+        server.login(EMAIL_USER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_USER, [email], message.encode("utf-8"))
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
 def get_client_free_runs(client_id: str, max_free_runs: int = 1) -> int:
@@ -665,6 +710,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
