@@ -467,7 +467,7 @@ if st.button("🚀 Обработать данные"):
 
     # 1) Пустое поле
     if not clean_client_id:
-    warn_box("Сначала укажите ваш e-mail выше.")
+        warn_box("Сначала укажите ваш e-mail выше.")
 elif not EMAIL_RE.match(clean_client_id):
     warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
 
@@ -653,6 +653,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
