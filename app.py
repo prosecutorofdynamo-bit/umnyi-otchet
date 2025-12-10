@@ -17,6 +17,25 @@ from google.oauth2.service_account import Credentials
 # ----------------- ВАЛИДАЦИЯ E-MAIL -----------------
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
+def warn_box(message: str):
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#ffffff;
+            border-left:6px solid #FFCA28;
+            border:1px solid #f0e6c8;
+            color:#8a6d00;
+            font-size:16px;
+            padding:12px 16px;
+            border-radius:6px;
+            margin-top:8px;
+        ">
+            {message}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # ----------------- GOOGLE SHEETS --------------------
 SHEET_ID = "12NIk4vQ0Z7av6b4JbAIVKyY_blYnb5Vacumy_4FCTdM"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -367,7 +386,7 @@ with col_right:
 
 # Если журнал не загружен — дальше не идём
 if file_journal is None:
-    st.warning("⬆ Сначала загрузите файл журнала проходов.")
+    warn_box("⬆ Сначала загрузите файл журнала проходов.")
     st.stop()
 
 st.caption("Перетащите файл сюда или нажмите «Browse files» для выбора файла журнала.")
@@ -448,10 +467,10 @@ if st.button("🚀 Обработать данные"):
 
     # 1) Пустое поле
     if not clean_client_id:
-        st.warning("Сначала укажите ваш e-mail выше.")
-    # 2) Невалидный e-mail
-    elif not EMAIL_RE.match(clean_client_id):
-        st.warning("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
+    warn_box("Сначала укажите ваш e-mail выше.")
+elif not EMAIL_RE.match(clean_client_id):
+    warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
+
     else:
         # 3) Проверка лимита в Google Sheets
         try:
@@ -634,5 +653,6 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
