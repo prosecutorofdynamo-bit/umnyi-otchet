@@ -7,6 +7,9 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from engine import build_report
 import json
+import re
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -381,14 +384,14 @@ st.subheader("Для одного бесплатного анализа укаж
 st.markdown(
     """
     Формирование первого отчёта — бесплатно.<br>
-    Напишите электронную почту или ник в Telegram — это поможет восстановить доступ и ответить на вопросы.
+    Напишите электронную почту — это поможет восстановить доступ и ответить на вопросы.
     """,
     unsafe_allow_html=True,
 )
 
 client_id = st.text_input(
-    "E-mail или ник в Telegram:",
-    placeholder="Например, ivan.petrov@company.ru или @ivanpetrov",
+    "E-mail",
+    placeholder="Например, ivan.petrov@company.ru",
     help="Нужен только для учёта бесплатных запусков и поддержки. Никакого спама.",
 )
 
@@ -584,6 +587,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
