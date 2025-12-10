@@ -429,21 +429,21 @@ st.caption(
     "Никакой рассылки или передачи данных третьим лицам."
 )
 
-# --- МГНОВЕННАЯ ПРОВЕРКА ФОРМАТА ПОЧТЫ ---
+# --- ПРОВЕРКА ПОЧТЫ, но НЕ показываем предупреждение сразу ---
 invalid_email = False
 clean_client_id = (client_id or "").strip()
 
+warning_message = None
+
 if clean_client_id and not EMAIL_RE.match(clean_client_id):
     invalid_email = True
-    pretty_warning("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
+    warning_message = "Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru"
+elif not clean_client_id:
+    warning_message = "Сначала укажите ваш e-mail выше."
 
-final_df = None
-
-if st.button("🚀 Обработать данные"):
-    # нет e-mail
-    if not clean_client_id:
-        pretty_warning("Сначала укажите ваш e-mail выше.")
-        st.stop()
+# --- ЕСЛИ есть предупреждение — показываем ЕГО ПЕРЕД кнопкой ---
+if warning_message:
+    pretty_warning(warning_message)
 
     # неверный e-mail
     if invalid_email:
@@ -631,3 +631,4 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
