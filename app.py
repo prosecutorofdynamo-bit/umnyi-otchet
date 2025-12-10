@@ -461,18 +461,23 @@ st.caption(
 
 final_df = None
 
-# ---- КНОПКА И ПРОВЕРКИ ----
+# --- МГНОВЕННАЯ ПРОВЕРКА ФОРМАТА ПОЧТЫ ---
+clean_client_id = (client_id or "").strip()
+invalid_email = False
+
+if clean_client_id and not EMAIL_RE.match(clean_client_id):
+    invalid_email = True
+    warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
+
 if st.button("🚀 Обработать данные"):
     clean_client_id = (client_id or "").strip()
 
-    # 1) Пустое поле
     if not clean_client_id:
         warn_box("Сначала укажите ваш e-mail выше.")
-elif not EMAIL_RE.match(clean_client_id):
-    warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
-
+    elif invalid_email:
+        warn_box("Сначала исправьте e-mail, чтобы продолжить.")
     else:
-        # 3) Проверка лимита в Google Sheets
+        # дальше всё как было: проверка лимита в Google Sheets и build_report
         try:
             free_left_before = get_client_free_runs(clean_client_id)
         except Exception as e:
@@ -490,7 +495,6 @@ elif not EMAIL_RE.match(clean_client_id):
                         border-radius: 6px;
                         color: #b71c1c;
                         font-size: 16px;
-                        margin-top: 10px;
                     ">
                         <b>⛔ Бесплатный лимит использован.</b><br>
                         Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
@@ -500,14 +504,12 @@ elif not EMAIL_RE.match(clean_client_id):
                 )
                 st.stop()
 
-            # 4) Пытаемся построить отчёт
             try:
                 final_df = build_report(file_journal, kadry_file)
             except Exception as e:
                 st.error("❌ Ошибка при обработке данных. Проверьте формат файлов и попробуйте ещё раз.")
                 st.code(repr(e))
             else:
-                # 5) Списываем запуск
                 try:
                     free_left_after = consume_client_run(clean_client_id)
                 except Exception as e:
@@ -525,7 +527,6 @@ elif not EMAIL_RE.match(clean_client_id):
 # если ещё не нажали кнопку или была ошибка — дальше не идём
 if final_df is None:
     st.stop()
-
 
 # ---------------- ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА ----------------
 st.header("Шаг 3. Выгрузка отчёта")
@@ -653,6 +654,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
