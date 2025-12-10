@@ -259,6 +259,97 @@ with col_example2:
 
 st.markdown("---")
 
+# === КРАСИВАЯ ФУНКЦИЯ ПРЕДУПРЕЖДЕНИЯ ===
+def pretty_warning(message: str):
+    st.markdown(
+        f"""
+        <div style="
+            background-color: #ffffff; 
+            border-left: 6px solid #FFCA28; 
+            border: 1px solid #f0e6c8; 
+            padding: 12px 16px; 
+            border-radius: 6px;
+            color: #8a6d00;
+            font-size: 16px;
+            margin: 8px 0;
+        ">
+            {message}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ---------------- ПРИМЕРЫ ФАЙЛОВ ----------------
+st.header("📂 Примеры загружаемых файлов")
+...
+# --- Шаг 1. Загрузка файлов ---
+
+# Если журнал не загружен — показываем наше белое предупреждение
+if file_journal is None:
+    pretty_warning("⬆ Сначала загрузите файл журнала проходов.")
+    st.stop()
+
+...
+
+# ---------------- ШАГ 2. ОБРАБОТКА ДАННЫХ ----------------
+st.header("Шаг 2. Обработка данных")
+
+client_id = st.text_input(
+    "E-mail",
+    placeholder="Например, ivan.petrov@company.ru",
+)
+
+clean_client_id = (client_id or "").strip()
+invalid_email = False
+
+# ✉ Мгновенная проверка формата почты
+if clean_client_id and not EMAIL_RE.match(clean_client_id):
+    invalid_email = True
+    pretty_warning("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
+
+final_df = None
+
+if st.button("🚀 Обработать данные"):
+
+    # ⚠ Нет e-mail
+    if not clean_client_id:
+        pretty_warning("Сначала укажите ваш e-mail выше.")
+        st.stop()
+
+    # ⚠ e-mail неправильного формата
+    if invalid_email:
+        pretty_warning("Сначала исправьте e-mail, чтобы продолжить.")
+        st.stop()
+
+    # ---- Проверяем лимит ----
+    try:
+        free_left_before = get_client_free_runs(clean_client_id)
+    except Exception as e:
+        st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте позже.")
+        st.code(repr(e))
+        st.stop()
+
+    if free_left_before <= 0:
+        st.markdown(
+            """
+            <div style="
+                background-color: #ffffff; 
+                border-left: 6px solid #E53935; 
+                border: 1px solid #e0e0e0; 
+                padding: 15px 18px; 
+                border-radius: 6px;
+                color: #b71c1c;
+                font-size: 16px;
+            ">
+                <b>⛔ Бесплатный лимит использован.</b><br>
+                Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
+
 # --- Шаг 1. Загрузка файлов ---
 st.header("Шаг 1. Загрузка файлов")
 
@@ -606,6 +697,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
