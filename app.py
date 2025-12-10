@@ -211,6 +211,17 @@ st.markdown(
         border-radius: 6px !important;
         padding: 8px 10px !important;
     }
+
+    /* === НОРМАЛЬНЫЕ ПРЕДУПРЕЖДЕНИЯ (st.warning) === */
+    div.stAlert[data-baseweb="alert"][kind="warning"] {
+        background-color: #ffffff !important;      /* белый фон */
+        border-left: 6px solid #FFCA28 !important; /* жёлтая полоса */
+        border: 1px solid #f0e6c8 !important;
+        color: #8a6d00 !important;                 /* тёмно-жёлтый текст */
+        font-size: 16px !important;
+        padding: 12px 16px !important;
+        border-radius: 6px !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -429,81 +440,73 @@ st.caption(
     "Никакой рассылки или передачи данных третьим лицам."
 )
 
-# --- ПРОВЕРКА ПОЧТЫ, но НЕ показываем предупреждение сразу ---
-invalid_email = False
-clean_client_id = (client_id or "").strip()
+final_df = None
 
-warning_message = None
+# ---- КНОПКА И ПРОВЕРКИ ----
+if st.button("🚀 Обработать данные"):
+    clean_client_id = (client_id or "").strip()
 
-if clean_client_id and not EMAIL_RE.match(clean_client_id):
-    invalid_email = True
-    warning_message = "Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru"
-elif not clean_client_id:
-    warning_message = "Сначала укажите ваш e-mail выше."
-
-# --- ЕСЛИ есть предупреждение — показываем ЕГО ПЕРЕД кнопкой ---
-if warning_message:
-    pretty_warning(warning_message)
-
-    # неверный e-mail
-    if invalid_email:
-        pretty_warning("Сначала исправьте e-mail, чтобы продолжить.")
-        st.stop()
-
-    # ---- Проверяем лимит ----
-    try:
-        free_left_before = get_client_free_runs(clean_client_id)
-    except Exception as e:
-        st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
-        st.code(repr(e))
-        st.stop()
-
-    if free_left_before <= 0:
-        st.markdown(
-            """
-            <div style="
-                background-color: #ffffff; 
-                border-left: 6px solid #E53935; 
-                border: 1px solid #e0e0e0; 
-                padding: 15px 18px; 
-                border-radius: 6px;
-                color: #b71c1c;
-                font-size: 16px;
-            ">
-                <b>⛔ Бесплатный лимит использован.</b><br>
-                Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.stop()
-
-    # ---- Формируем отчёт ----
-    try:
-        final_df = build_report(file_journal, kadry_file)
-    except Exception as e:
-        st.error("❌ Ошибка при обработке данных. Проверьте формат файлов и попробуйте ещё раз.")
-        st.code(repr(e))
-        st.stop()
+    # 1) Пустое поле
+    if not clean_client_id:
+        st.warning("Сначала укажите ваш e-mail выше.")
+    # 2) Невалидный e-mail
+    elif not EMAIL_RE.match(clean_client_id):
+        st.warning("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
     else:
-        # Списываем запуск
+        # 3) Проверка лимита в Google Sheets
         try:
-            free_left_after = consume_client_run(clean_client_id)
+            free_left_before = get_client_free_runs(clean_client_id)
         except Exception as e:
-            free_left_after = None
-            st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
+            st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
             st.code(repr(e))
+        else:
+            if free_left_before <= 0:
+                st.markdown(
+                    """
+                    <div style="
+                        background-color: #ffffff; 
+                        border-left: 6px solid #E53935; 
+                        border: 1px solid #e0e0e0; 
+                        padding: 15px 18px; 
+                        border-radius: 6px;
+                        color: #b71c1c;
+                        font-size: 16px;
+                        margin-top: 10px;
+                    ">
+                        <b>⛔ Бесплатный лимит использован.</b><br>
+                        Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.stop()
 
-        st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
-        if free_left_after is not None:
-            if free_left_after > 0:
-                st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
+            # 4) Пытаемся построить отчёт
+            try:
+                final_df = build_report(file_journal, kadry_file)
+            except Exception as e:
+                st.error("❌ Ошибка при обработке данных. Проверьте формат файлов и попробуйте ещё раз.")
+                st.code(repr(e))
             else:
-                st.info("Бесплатных запусков по этому e-mail больше не осталось.")
+                # 5) Списываем запуск
+                try:
+                    free_left_after = consume_client_run(clean_client_id)
+                except Exception as e:
+                    free_left_after = None
+                    st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
+                    st.code(repr(e))
+
+                st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
+                if free_left_after is not None:
+                    if free_left_after > 0:
+                        st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
+                    else:
+                        st.info("Бесплатных запусков по этому e-mail больше не осталось.")
 
 # если ещё не нажали кнопку или была ошибка — дальше не идём
 if final_df is None:
     st.stop()
+
 
 # ---------------- ШАГ 3. ПРЕДПРОСМОТР И ВЫГРУЗКА ----------------
 st.header("Шаг 3. Выгрузка отчёта")
@@ -631,4 +634,5 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
