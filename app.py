@@ -504,6 +504,14 @@ st.caption(
     "Никакой рассылки или передачи данных третьим лицам."
 )
 
+# ---------- ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ДЛЯ КОДА ----------
+if "verification_email" not in st.session_state:
+    st.session_state["verification_email"] = None
+if "verification_code" not in st.session_state:
+    st.session_state["verification_code"] = None
+if "email_verified" not in st.session_state:
+    st.session_state["email_verified"] = False
+
 final_df = None
 
 # --- МГНОВЕННАЯ ПРОВЕРКА ФОРМАТА ПОЧТЫ ---
@@ -514,6 +522,53 @@ if clean_client_id and not EMAIL_RE.match(clean_client_id):
     invalid_email = True
     warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
 
+# ---------- КНОПКА «ПОЛУЧИТЬ КОД» ----------
+if st.button("📩 Отправить код на почту"):
+    clean_client_id = (client_id or "").strip()
+
+    if not clean_client_id:
+        warn_box("Сначала укажите ваш e-mail выше.")
+    elif invalid_email:
+        warn_box("Сначала исправьте e-mail, чтобы продолжить.")
+    else:
+        code = generate_code()
+        try:
+            send_verification_code(clean_client_id, code)
+        except Exception as e:
+            st.error("❌ Не удалось отправить код на почту. Проверьте e-mail или попробуйте позже.")
+            st.code(repr(e))
+        else:
+            st.session_state["verification_email"] = clean_client_id
+            st.session_state["verification_code"] = code
+            st.session_state["email_verified"] = False
+            st.success("✅ Код отправлен на указанную почту. Введите его ниже.")
+
+# ---------- ПОЛЕ ВВОДА КОДА, ЕСЛИ ОН УЖЕ ОТПРАВЛЕН ----------
+code_input = None
+if (
+    st.session_state.get("verification_email") == clean_client_id
+    and st.session_state.get("verification_code")
+):
+    code_input = st.text_input(
+        "Код из письма",
+        max_chars=6,
+        help="Введите 6-значный код, который пришёл вам на e-mail.",
+    )
+
+    if st.button("✅ Подтвердить e-mail"):
+        if (code_input or "").strip() == st.session_state.get("verification_code"):
+            st.session_state["email_verified"] = True
+            st.success("E-mail подтверждён. Теперь можно формировать отчёт.")
+        else:
+            warn_box("Неверный код. Проверьте письмо и попробуйте ещё раз.")
+
+# Флаг: текущий e-mail подтверждён?
+verified = (
+    st.session_state.get("email_verified", False)
+    and st.session_state.get("verification_email") == clean_client_id
+)
+
+# ---------- КНОПКА «ОБРАБОТАТЬ ДАННЫЕ» ----------
 if st.button("🚀 Обработать данные"):
     clean_client_id = (client_id or "").strip()
 
@@ -521,6 +576,8 @@ if st.button("🚀 Обработать данные"):
         warn_box("Сначала укажите ваш e-mail выше.")
     elif invalid_email:
         warn_box("Сначала исправьте e-mail, чтобы продолжить.")
+    elif not verified:
+        warn_box("Сначала подтвердите e-mail через код из письма.")
     else:
         # 1) проверяем лимит
         try:
@@ -710,6 +767,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
