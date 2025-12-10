@@ -31,25 +31,39 @@ except Exception as e:
 
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
-def register_client_run(client_id: str, max_free_runs: int = 1):
+def get_client_free_runs(client_id: str, max_free_runs: int = 1) -> int:
     """
-    Учёт запусков в Google Sheets.
-    Для каждого client_id даём max_free_runs бесплатных запусков.
-    Возвращает (allowed: bool, free_left: int).
+    Возвращает, сколько бесплатных запусков осталось у client_id.
+    Ничего не списывает.
     """
-    records = sheet.get_all_records()  # [{'client_id': ..., 'free_runs_left': ..., ...}, ...]
+    records = sheet.get_all_records()
 
-    # Ищем клиента в уже существующих строках
-    for idx, row in enumerate(records, start=2):  # данные со 2-й строки (1 — заголовки)
+    for row in records:
+        if row.get("client_id") == client_id:
+            free_left = int(row.get("free_runs_left") or 0)
+            return max(free_left, 0)
+
+    # Клиента ещё нет — значит, ему доступен полный лимит
+    return max_free_runs
+
+
+def consume_client_run(client_id: str, max_free_runs: int = 1) -> int:
+    """
+    Списывает один бесплатный запуск и обновляет Google Sheets.
+    Возвращает, сколько запусков осталось после списания.
+    """
+    records = sheet.get_all_records()
+
+    # Ищем существующую строку
+    for idx, row in enumerate(records, start=2):  # данные со 2-й строки
         if row.get("client_id") == client_id:
             free_left = int(row.get("free_runs_left") or 0)
             total_runs = int(row.get("total_runs") or 0)
 
-            # Лимит исчерпан — блокируем
+            # Если уже нечего списывать — просто возвращаем 0
             if free_left <= 0:
-                return False, 0
+                return 0
 
-            # Иначе уменьшаем остаток и увеличиваем total_runs
             free_left -= 1
             total_runs += 1
 
@@ -57,9 +71,9 @@ def register_client_run(client_id: str, max_free_runs: int = 1):
             sheet.update_cell(idx, 3, total_runs)  # C: total_runs
             sheet.update_cell(idx, 4, pd.Timestamp.utcnow().isoformat())  # D: last_run
 
-            return True, free_left
+            return free_left
 
-    # Если клиента нет — создаём новую строку
+    # Клиента ещё нет — создаём строку
     free_left = max_free_runs - 1
     total_runs = 1
 
@@ -72,7 +86,7 @@ def register_client_run(client_id: str, max_free_runs: int = 1):
         ]
     )
 
-    return True, free_left
+    return free_left
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -389,14 +403,15 @@ if st.button("🚀 Обработать данные"):
     if not clean_client_id:
         st.warning("Сначала укажите ваш e-mail или ник в Telegram выше.")
     else:
-        # Проверяем лимит запусков по контактам в Google Sheets
+        # 1. Сначала проверяем, остались ли бесплатные запуски
         try:
-            allowed, free_left = register_client_run(clean_client_id)
+            free_left_before = get_client_free_runs(clean_client_id)
         except Exception as e:
             st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
             st.code(repr(e))
         else:
-            if not allowed:
+            if free_left_before <= 0:
+                # красивый блок про исчерпанный лимит
                 st.markdown(
                     """
                     <div style="
@@ -408,24 +423,37 @@ if st.button("🚀 Обработать данные"):
                         color: #b71c1c;
                         font-size: 16px;
                     ">
-                        <b>⛔ Бесплатный лимит исчерпан.</b><br>
-                        Чтобы получить дополнительный доступ — напишите нам.
+                        <b>⛔ Бесплатный лимит использован.</b><br>
+                        Чтобы получить дополнительный доступ — напишите нам, и мы подключим расширенный режим.
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
                 st.stop()
+
+            # 2. Лимит есть — пробуем строить отчёт
+            try:
+                final_df = build_report(file_journal, kadry_file)
+            except Exception as e:
+                # ВАЖНО: здесь НИЧЕГО не списываем
+                st.error("❌ Ошибка при обработке данных. Проверьте формат файлов и попробуйте ещё раз.")
+                st.code(repr(e))
             else:
+                # 3. Отчёт успешно построен — теперь списываем запуск
                 try:
-                    final_df = build_report(file_journal, kadry_file)
+                    free_left_after = consume_client_run(clean_client_id)
                 except Exception as e:
-                    st.error(f"❌ Ошибка при обработке данных: {e}")
-                else:
-                    st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
-                    if free_left > 0:
-                        st.info(f"Осталось бесплатных запусков по этому контакту: {free_left}.")
+                    free_left_after = None
+                    st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
+                    st.code(repr(e))
+
+                st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
+                if free_left_after is not None:
+                    if free_left_after > 0:
+                        st.info(f"Осталось бесплатных запусков по этому контакту: {free_left_after}.")
                     else:
                         st.info("Бесплатных запусков по этому контакту больше не осталось.")
+
 # если ещё не нажали кнопку или была ошибка — дальше не идём
 if final_df is None:
     st.stop()
@@ -556,6 +584,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
