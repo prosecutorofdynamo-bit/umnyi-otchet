@@ -101,6 +101,18 @@ st.set_page_config(
 # ---------------- ГЛОБАЛЬНЫЙ СТИЛЬ (CSS) ----------------
 st.markdown(
     """
+
+    /* === НОРМАЛЬНЫЕ ПРЕДУПРЕЖДЕНИЯ (st.warning) === */
+div.stAlert[data-baseweb="alert"][kind="warning"] {
+    background-color: #ffffff !important;  /* белый фон */
+    border-left: 6px solid #FFCA28 !important;  /* жёлтая полоса */
+    border: 1px solid #f0e6c8 !important;
+    color: #8a6d00 !important;  /* тёмно-жёлтый текст, читаемый */
+    font-size: 16px !important;
+    padding: 12px 16px !important;
+    border-radius: 6px !important;
+}
+    
     <style>
     .stApp {
         background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
@@ -595,6 +607,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
