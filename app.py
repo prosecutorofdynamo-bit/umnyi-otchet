@@ -101,127 +101,124 @@ st.set_page_config(
 # ---------------- ГЛОБАЛЬНЫЙ СТИЛЬ (CSS) ----------------
 st.markdown(
     """
+  
+    <style>
+.stApp {
+    background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
+    color: #102A43 !important;
+    font-size: 16px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
 
-    /* === НОРМАЛЬНЫЕ ПРЕДУПРЕЖДЕНИЯ (st.warning) === */
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+}
+
+/* === ЗАГРУЗЧИК ФАЙЛОВ === */
+
+[data-testid="stFileUploader"] section {
+    background-color: #f5f7fb !important;
+    border: 1px solid #d0d7ea !important;
+    border-radius: 8px !important;
+    color: #102A43 !important;
+}
+
+[data-testid="stFileDropzone"] span,
+[data-testid="stFileUploaderInstructions"] {
+    display: none !important;
+}
+
+[data-testid="stFileUploader"] button {
+    background-color: #eef3ff !important;
+    color: #003366 !important;
+    border: 1px solid #d0d7ea !important;
+    border-radius: 6px !important;
+    padding: 6px 14px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+}
+[data-testid="stFileUploader"] button:hover {
+    background-color: #d6e4ff !important;
+}
+
+[data-testid="stFileDropzone"] {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+[data-testid="stFileUploaderFileName"] {
+    color: #003366 !important;
+    background-color: #ffffff !important;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+}
+[data-testid="stFileUploaderSize"] {
+    color: #4a637e !important;
+    background-color: #ffffff !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    margin-left: 4px !important;
+    font-size: 13px !important;
+}
+
+.stButton > button, .stDownloadButton > button {
+    background-color: #1E88E5 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 10px 22px !important;
+    font-size: 16px !important;
+    border: none !important;
+    font-weight: 600 !important;
+    transition: 0.3s ease-in-out;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background-color: #1565C0 !important;
+    transform: translateY(-1px);
+}
+
+h1, h2, h3, h4 {
+    color: #102A43 !important;
+    font-weight: 700 !important;
+}
+
+.file-label {
+    padding: 4px 10px;
+    margin: 4px 0;
+    border-radius: 6px;
+    background-color: #eef3ff;
+    color: #003366;
+    font-weight: 600;
+    display: inline-block;
+}
+
+[data-testid="stDataFrame"] div[role="grid"] {
+    background-color: #ffffff !important;
+    color: #102A43 !important;
+}
+
+/* === ПОЛЕ ВВОДА E-MAIL === */
+.stTextInput > div > div > input {
+    background-color: #ffffff !important;
+    color: #102A43 !important;
+    border: 1px solid #d0d7ea !important;
+    border-radius: 6px !important;
+    padding: 8px 10px !important;
+}
+
+/* === КРАСИВЫЕ st.warning === */
 div.stAlert[data-baseweb="alert"][kind="warning"] {
-    background-color: #ffffff !important;  /* белый фон */
-    border-left: 6px solid #FFCA28 !important;  /* жёлтая полоса */
+    background-color: #ffffff !important;
+    border-left: 6px solid #FFCA28 !important;
     border: 1px solid #f0e6c8 !important;
-    color: #8a6d00 !important;  /* тёмно-жёлтый текст, читаемый */
+    color: #8a6d00 !important;
     font-size: 16px !important;
     padding: 12px 16px !important;
     border-radius: 6px !important;
 }
-    
-    <style>
-    .stApp {
-        background: linear-gradient(135deg, #e4f0ff 0%, #ffffff 55%) !important;
-        color: #102A43 !important;
-        font-size: 16px !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-    }
-
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
-    }
-
-    /* === ЗАГРУЗЧИК ФАЙЛОВ === */
-
-    [data-testid="stFileUploader"] section {
-        background-color: #f5f7fb !important;
-        border: 1px solid #d0d7ea !important;
-        border-radius: 8px !important;
-        color: #102A43 !important;
-    }
-
-    [data-testid="stFileDropzone"] span,
-    [data-testid="stFileUploaderInstructions"] {
-        display: none !important;
-    }
-
-    [data-testid="stFileUploader"] button {
-        background-color: #eef3ff !important;
-        color: #003366 !important;
-        border: 1px solid #d0d7ea !important;
-        border-radius: 6px !important;
-        padding: 6px 14px !important;
-        font-weight: 600 !important;
-        box-shadow: none !important;
-    }
-    [data-testid="stFileUploader"] button:hover {
-        background-color: #d6e4ff !important;
-    }
-
-    [data-testid="stFileDropzone"] {
-        background-color: transparent !important;
-        border: none !important;
-    }
-
-    [data-testid="stFileUploaderFileName"] {
-        color: #003366 !important;
-        background-color: #ffffff !important;
-        padding: 4px 8px !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        display: inline-block !important;
-    }
-    [data-testid="stFileUploaderSize"] {
-        color: #4a637e !important;
-        background-color: #ffffff !important;
-        padding: 2px 6px !important;
-        border-radius: 4px !important;
-        margin-left: 4px !important;
-        font-size: 13px !important;
-    }
-
-    .stButton > button, .stDownloadButton > button {
-        background-color: #1E88E5 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        padding: 10px 22px !important;
-        font-size: 16px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        transition: 0.3s ease-in-out;
-    }
-    .stButton > button:hover, .stDownloadButton > button:hover {
-        background-color: #1565C0 !important;
-        transform: translateY(-1px);
-    }
-
-    h1, h2, h3, h4 {
-        color: #102A43 !important;
-        font-weight: 700 !important;
-    }
-
-    .file-label {
-        padding: 4px 10px;
-        margin: 4px 0;
-        border-radius: 6px;
-        background-color: #eef3ff;
-        color: #003366;
-        font-weight: 600;
-        display: inline-block;
-    }
-
-    [data-testid="stDataFrame"] div[role="grid"] {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-    }
-
-    /* === ПОЛЕ ВВОДА E-MAIL / TELEGRAM === */
-    .stTextInput > div > div > input {
-        background-color: #ffffff !important;
-        color: #102A43 !important;
-        border: 1px solid #d0d7ea !important;
-        border-radius: 6px !important;
-        padding: 8px 10px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+</style>
 
 # ---------------- ГЛАВНЫЙ ЗАГОЛОВОК ----------------
 st.markdown(
@@ -607,6 +604,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
