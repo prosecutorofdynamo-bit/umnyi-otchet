@@ -65,10 +65,6 @@ EMAIL_HOST = st.secrets.get("EMAIL_HOST", "smtp.yandex.ru")
 EMAIL_PORT = int(st.secrets.get("EMAIL_PORT", 465))
 EMAIL_USER = st.secrets.get("EMAIL_USER")
 EMAIL_PASSWORD = st.secrets.get("EMAIL_PASSWORD")
-st.write("DEBUG_EMAIL:", {
-    "EMAIL_USER": repr(EMAIL_USER),
-    "EMAIL_PASSWORD_EMPTY": EMAIL_PASSWORD is None or EMAIL_PASSWORD == "",
-})
 
 # --------- /SMTP ДЛЯ ОТПРАВКИ КОДА НА ПОЧТУ ---------
 
@@ -772,6 +768,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
