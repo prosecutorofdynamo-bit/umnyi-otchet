@@ -9,7 +9,7 @@ import smtplib
 import ssl
 import secrets as py_secrets
 import string
-
+import time
 
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
@@ -512,12 +512,26 @@ if "verification_code" not in st.session_state:
     st.session_state["verification_code"] = None
 if "email_verified" not in st.session_state:
     st.session_state["email_verified"] = False
+# когда отправили код
+if "code_sent_at" not in st.session_state:
+    st.session_state["code_sent_at"] = None
+# сколько раз отправляли код в этой сессии
+if "code_send_count" not in st.session_state:
+    st.session_state["code_send_count"] = 0
 
 final_df = None
 
 # --- МГНОВЕННАЯ ПРОВЕРКА ФОРМАТА ПОЧТЫ ---
 clean_client_id = (client_id or "").strip()
 invalid_email = False
+# если пользователь изменил e-mail, сбрасываем старое подтверждение
+if (
+    st.session_state.get("verification_email") is not None
+    and st.session_state["verification_email"] != clean_client_id
+):
+    st.session_state["email_verified"] = False
+    st.session_state["verification_code"] = None
+    st.session_state["code_sent_at"] = None
 
 if clean_client_id and not EMAIL_RE.match(clean_client_id):
     invalid_email = True
@@ -532,17 +546,41 @@ if st.button("📩 Отправить код на почту"):
     elif invalid_email:
         warn_box("Сначала исправьте e-mail, чтобы продолжить.")
     else:
-        code = generate_code()
-        try:
-            send_verification_code(clean_client_id, code)
-        except Exception as e:
-            st.error("❌ Не удалось отправить код на почту. Проверьте e-mail или попробуйте позже.")
-            st.code(repr(e))
+        now = time.time()
+        cooldown = 60  # секунд между отправками
+        last_sent = st.session_state.get("code_sent_at")
+        send_count = st.session_state.get("code_send_count", 0)
+        max_per_session = 5
+
+        # лимит по числу попыток за сессию
+        if send_count >= max_per_session:
+            warn_box("За эту сессию было отправлено слишком много кодов. Попробуйте чуть позже.")
         else:
-            st.session_state["verification_email"] = clean_client_id
-            st.session_state["verification_code"] = code
-            st.session_state["email_verified"] = False
-            st.success("✅ Код отправлен на указанную почту. Введите его ниже.")
+            # проверяем кулдаун
+            if last_sent is not None:
+                elapsed = int(now - last_sent)
+                remaining = cooldown - elapsed
+                if remaining > 0:
+                    warn_box(f"Код уже отправлен. Новый можно запросить через {remaining} сек.")
+                    # не отправляем ещё раз
+                    pass
+                else:
+                    last_sent = None  # кулдаун прошёл
+
+            if last_sent is None:
+                code = generate_code()
+                try:
+                    send_verification_code(clean_client_id, code)
+                except Exception as e:
+                    st.error("❌ Не удалось отправить код на почту. Проверьте e-mail или попробуйте позже.")
+                    st.code(repr(e))
+                else:
+                    st.session_state["verification_email"] = clean_client_id
+                    st.session_state["verification_code"] = code
+                    st.session_state["email_verified"] = False
+                    st.session_state["code_sent_at"] = now
+                    st.session_state["code_send_count"] = send_count + 1
+                    st.success("✅ Код отправлен на указанную почту. Введите его ниже (код действует 5 минут).")
 
 # ---------- ПОЛЕ ВВОДА КОДА, ЕСЛИ ОН УЖЕ ОТПРАВЛЕН ----------
 code_input = None
@@ -557,11 +595,23 @@ if (
     )
 
     if st.button("✅ Подтвердить e-mail"):
-        if (code_input or "").strip() == st.session_state.get("verification_code"):
-            st.session_state["email_verified"] = True
-            st.success("E-mail подтверждён. Теперь можно формировать отчёт.")
+        stored_code = st.session_state.get("verification_code")
+        sent_at = st.session_state.get("code_sent_at")
+
+        if not stored_code or not sent_at:
+            warn_box("Сначала запросите код на почту.")
         else:
-            warn_box("Неверный код. Проверьте письмо и попробуйте ещё раз.")
+            # проверяем, не истёк ли код (5 минут = 300 секунд)
+            if time.time() - sent_at > 300:
+                st.session_state["verification_code"] = None
+                st.session_state["email_verified"] = False
+                warn_box("Срок действия кода истёк. Нажмите «Отправить код на почту», чтобы получить новый.")
+            else:
+                if (code_input or "").strip() == stored_code:
+                    st.session_state["email_verified"] = True
+                    st.success("E-mail подтверждён. Теперь можно формировать отчёт.")
+                else:
+                    warn_box("Неверный код. Проверьте письмо и попробуйте ещё раз.")
 
 # Флаг: текущий e-mail подтверждён?
 verified = (
@@ -610,33 +660,40 @@ if st.button("🚀 Обработать данные"):
             # 2) пробуем собрать отчёт
             try:
                 final_df = build_report(file_journal, kadry_file)
-            except Exception as e:
+                        except Exception as e:
                 final_df = None
-                st.error("❌ Ошибка при обработке данных. Проверьте формат файлов и попробуйте ещё раз.")
-                st.code(repr(e))
-            else:
-                # 3) проверяем, что итог — именно DataFrame и не пустой
-                if not isinstance(final_df, pd.DataFrame) or final_df.empty:
-                    final_df = None
+                msg = str(e)
+
+                if "Не удалось прочитать журнал" in msg:
                     st.error(
-                        "❌ Отчёт не удалось построить: результат пустой или в неожиданном формате.\n\n"
-                        "Проверьте, что загружены правильные файлы журнала и кадров."
+                        "❌ Не удалось прочитать файл журнала. "
+                        "Проверьте, что в нём есть колонки: "
+                        "«Событие», «Дата события», «Фамилия», «Имя», "
+                        "«Отчество», «Вход», «Выход»."
                     )
                 else:
-                    # 4) только после УСПЕХА списываем запуск
-                    try:
-                        free_left_after = consume_client_run(clean_client_id)
-                    except Exception as e:
-                        free_left_after = None
-                        st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
-                        st.code(repr(e))
+                    st.error(
+                        "❌ Ошибка при обработке данных. "
+                        "Проверьте формат файлов и попробуйте ещё раз."
+                    )
 
-                    st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
-                    if free_left_after is not None:
-                        if free_left_after > 0:
-                            st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
-                        else:
-                            st.info("Бесплатных запусков по этому e-mail больше не осталось.")
+                st.code(msg)
+
+            else:
+                # 4) только после УСПЕХА списываем запуск
+                try:
+                    free_left_after = consume_client_run(clean_client_id)
+                except Exception as e:
+                    free_left_after = None
+                    st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
+                    st.code(repr(e))
+
+                st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
+                if free_left_after is not None:
+                    if free_left_after > 0:
+                        st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
+                    else:
+                        st.info("Бесплатных запусков по этому e-mail больше не осталось.")
 
 # если ещё не нажали кнопку или была ошибка — дальше не идём
 if final_df is None:
@@ -768,6 +825,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
