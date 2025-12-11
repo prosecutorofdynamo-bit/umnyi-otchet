@@ -660,7 +660,7 @@ if st.button("🚀 Обработать данные"):
             # 2) пробуем собрать отчёт
             try:
                 final_df = build_report(file_journal, kadry_file)
-                        except Exception as e:
+            except Exception as e:
                 final_df = None
                 msg = str(e)
 
@@ -678,9 +678,8 @@ if st.button("🚀 Обработать данные"):
                     )
 
                 st.code(msg)
-
             else:
-                # 4) только после УСПЕХА списываем запуск
+                # 4) только после УСПЕШНОГО отчёта списываем запуск
                 try:
                     free_left_after = consume_client_run(clean_client_id)
                 except Exception as e:
@@ -825,6 +824,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
