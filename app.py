@@ -82,6 +82,10 @@ def send_verification_code(email: str, code: str) -> None:
     if not EMAIL_USER or not EMAIL_PASSWORD:
         raise RuntimeError("SMTP учётные данные не заданы в secrets")
 
+    # --- ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ (видно в логах Streamlit Cloud) ---
+    print(f"[EMAIL_DEBUG] Попытка отправить код {code!r} на адрес {email!r}")
+    print(f"[EMAIL_DEBUG] SMTP_HOST={EMAIL_HOST}, SMTP_PORT={EMAIL_PORT}, USER={EMAIL_USER!r}")
+
     subject = "Код подтверждения для умного отчёта"
     body = (
         f"Ваш код подтверждения: {code}\n\n"
@@ -101,6 +105,9 @@ def send_verification_code(email: str, code: str) -> None:
     with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, context=context) as server:
         server.login(EMAIL_USER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_USER, [email], message.encode("utf-8"))
+
+    # если дошли до сюда — письмо ушло без исключений
+    print(f"[EMAIL_DEBUG] Код {code!r} успешно отправлен на {email!r}")
 
 # ---------- ОГРАНИЧЕНИЕ ЗАПУСКОВ (MVP) ----------
 def get_client_free_runs(client_id: str, max_free_runs: int = 1) -> int:
@@ -537,6 +544,38 @@ if clean_client_id and not EMAIL_RE.match(clean_client_id):
     invalid_email = True
     warn_box("Похоже, вы ввели некорректный e-mail. Пример: ivan.petrov@company.ru")
 
+# ---------- НЕБОЛЬШОЙ СТАТУС ПОД ПОЛЕМ E-MAIL ----------
+current_email = clean_client_id
+verification_email = st.session_state.get("verification_email")
+code_stored = st.session_state.get("verification_code")
+email_verified_flag = st.session_state.get("email_verified", False)
+
+if current_email:
+    # e-mail подтверждён и совпадает с текущим
+    if email_verified_flag and verification_email == current_email:
+        st.markdown(
+            "<div style='color:#2e7d32; font-size:14px; margin-top:4px;'>"
+            "✅ E-mail подтверждён. Можно переходить к шагу 3 — формированию отчёта."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    # код уже отправляли, но ещё не подтвердили
+    elif code_stored and verification_email == current_email:
+        st.markdown(
+            "<div style='color:#1565C0; font-size:14px; margin-top:4px;'>"
+            "✉ Код был отправлен на этот адрес. Проверьте почту и введите код ниже."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    # e-mail корректный, но код ещё не запрашивали
+    elif not invalid_email:
+        st.markdown(
+            "<div style='color:#555; font-size:13px; margin-top:4px;'>"
+            "Чтобы пользоваться сервисом бесплатно, нажмите «Отправить код на почту» и подтвердите адрес."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
 # ---------- КНОПКА «ПОЛУЧИТЬ КОД» ----------
 if st.button("📩 Отправить код на почту"):
     clean_client_id = (client_id or "").strip()
@@ -824,6 +863,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
