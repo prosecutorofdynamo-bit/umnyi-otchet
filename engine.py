@@ -501,7 +501,7 @@ def _calc_group_stats(df: pd.DataFrame):
     for (fio, day), grp in df.groupby(["ФИО", "Рабочий_день"], sort=False):
         grp = grp.sort_values("Дата события")
         first_ts = grp["Дата события"].iloc[0]
-        last_ts = grp["Дата события"].iloc[-1]
+        last_ts = grp[grp["Выход"].str.contains("Шлюз", na=False)]["Дата события"].max()
         dur_min = int(
             (last_ts - first_ts).total_seconds() / 60.0
         ) if pd.notna(last_ts) and pd.notna(first_ts) else 0
@@ -766,6 +766,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
