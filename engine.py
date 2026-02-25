@@ -327,7 +327,7 @@ def inside_minutes_between(
     # состояние на момент a
     hist = g[g["Дата события"] <= a]
     last_dest = hist.iloc[-1]["dest_n"] if len(hist) else ""
-    inside = OUTSIDE not in last_dest
+    inside = init_inside_at(a, grp, right_col)
 
     # дедуп одинаковых подряд меток
     ded = []
@@ -382,7 +382,7 @@ def longest_outside_gap_between(
     # состояние на момент a
     hist = g[g["Дата события"] <= a]
     last_dest = hist.iloc[-1]["dest_n"] if len(hist) else ""
-    outside = OUTSIDE in last_dest
+    outside = not init_inside_at(a, grp, right_col)
 
     ded = []
     for _, row in sec.iterrows():
@@ -416,6 +416,13 @@ def longest_outside_gap_between(
 
     return int(round(best)), best_a, best_b
 
+def _fmt_leave(ts):
+    if pd.isna(ts):
+        return ""
+    s = ts.strftime("%H:%M")
+    if ts.hour < 6:
+        s += f" ({ts.strftime('%d.%m')})"
+    return s
 
 def compute_outside_table(df: pd.DataFrame, right_col: str) -> pd.DataFrame:
     """
@@ -457,7 +464,7 @@ def compute_outside_table(df: pd.DataFrame, right_col: str) -> pd.DataFrame:
                 "ФИО": fio,
                 "Дата": base.date(),
                 "Время прихода": first.strftime("%H:%M") if pd.notna(first) else "",
-                "Время ухода": last.strftime("%H:%M") if pd.notna(last) else "",
+                "Время ухода": _fmt_leave(last),
                 "Вне_ядра_мин": int(round(out_core_min)),
                 "Отсутствие более 2 часов подряд": gap_period,
             }
@@ -763,6 +770,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
