@@ -661,11 +661,13 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         stats_df[["ФИО", "Дата", "Продолжительность_мин", "Общее время", "Опоздание"]],
         on=["ФИО", "Дата"],
         how="left",
+        validate="one_to_one",
     )
     final = final.merge(
         exits_df[["ФИО", "Дата", "Выходы", "suspect"]],
         on=["ФИО", "Дата"],
         how="left",
+        validate="one_to_one",
     )
 
     final["Выходы"] = final["Выходы"].fillna(0).astype(int)
@@ -766,6 +768,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
