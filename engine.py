@@ -325,8 +325,6 @@ def inside_minutes_between(
     sec = sec.dropna(subset=["label"]).reset_index(drop=True)
 
     # состояние на момент a
-    hist = g[g["Дата события"] <= a]
-    last_dest = hist.iloc[-1]["dest_n"] if len(hist) else ""
     inside = init_inside_at(a, grp, right_col)
 
     # дедуп одинаковых подряд меток
@@ -380,8 +378,6 @@ def longest_outside_gap_between(
     sec = sec.dropna(subset=["label"]).reset_index(drop=True)
 
     # состояние на момент a
-    hist = g[g["Дата события"] <= a]
-    last_dest = hist.iloc[-1]["dest_n"] if len(hist) else ""
     outside = not init_inside_at(a, grp, right_col)
 
     ded = []
@@ -770,6 +766,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
