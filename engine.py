@@ -94,6 +94,41 @@ def norm(s):
     s = "" if pd.isna(s) else str(s)
     return unicodedata.normalize("NFKC", s).strip().casefold()
 
+def last_known_dest_before(g: pd.DataFrame, right_col: str, ts: pd.Timestamp, lower_bound=None) -> str:
+    if g is None or g.empty:
+        return ""
+    h = g[g["Дата события"] <= ts].copy()
+    if lower_bound is not None:
+        h = h[h["Дата события"] >= lower_bound]
+    if h.empty:
+        return ""
+    h["dest_n"] = h[right_col].map(norm)
+    # оставляем только понятные метки (офис/шлюз)
+    h = h[h["dest_n"].apply(lambda s: (INSIDE_HINT in s) or (OUTSIDE in s))]
+    if h.empty:
+        return ""
+    return str(h.iloc[-1]["dest_n"])
+
+
+def init_inside_at(a: pd.Timestamp, grp: pd.DataFrame, right_col: str) -> bool:
+    """
+    Если после 06:00 нет понятных событий — считаем СНАРУЖИ (False).
+    """
+    if grp is None or grp.empty:
+        return False
+
+    g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
+
+    day_0600 = pd.Timestamp(a).normalize() + pd.Timedelta(hours=6)
+    if a < day_0600:
+        day_0600 = day_0600 - pd.Timedelta(days=1)
+
+    last_dest = last_known_dest_before(g, right_col, a, lower_bound=day_0600)
+
+    if not last_dest:
+        return False  # нет данных -> снаружи
+
+    return not (OUTSIDE in last_dest)
 
 # --- Фильтрация «не людей» (карты, клининг и т.п.) ---
 NONPERSON_TOKENS = [
@@ -194,16 +229,15 @@ def read_journal(file_obj) -> pd.DataFrame:
 
     df["Вход_n"] = df["Вход"].apply(norm)
     df["Выход_n"] = df["Выход"].apply(norm)
-    ok = ~(
+    bad_both = (
         df["Вход_n"].str.contains("неконтролируем", na=False)
-        | df["Выход_n"].str.contains("неконтролируем", na=False)
+        & df["Выход_n"].str.contains("неконтролируем", na=False)
     )
-    df = df[ok].copy()
+    df = df[~bad_both].copy()
 
     df = df[~df["ФИО"].apply(is_nonperson)].copy()
 
     return df
-
 
 # ===================== ЧТЕНИЕ КАДРОВОГО ФАЙЛА =====================
 
@@ -491,80 +525,83 @@ def _calc_group_stats(df: pd.DataFrame):
     st["Общее время"] = st["Продолжительность_мин"].apply(fmt_hm)
     return st
 
-
 def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
     """
     Для каждого дня:
       - количество выходов в ядре (09–18), считаем только выходы
-        длительностью >= EXIT_MIN_DURATION минут (как в Колабе)
-      - флаг 'suspect' (возможен проход вне терминала)
+        длительностью >= EXIT_MIN_DURATION минут
+      - флаг 'suspect' (возможен проход вне терминала):
+        два одинаковых подряд события (in->in или out->out) с разрывом > 60 минут
     """
+    SUSPECT_GAP_MIN = 60
     rows = []
 
     for (fio, day), grp in df.groupby(["ФИО", "Рабочий_день"], sort=False):
         base = pd.Timestamp(day).normalize()
         a_core, b_core = _core_window_for_day(base)
 
+        # стартовое состояние на 09:00 (объективно)
+        inside = init_inside_at(a_core, grp, right_col)  # True=в офисе, False=снаружи
+
         g = grp.sort_values("Дата события")[["Дата события", right_col]].copy()
         g["dest_n"] = g[right_col].map(norm)
 
-        # только события в ядре
-        g = g[(g["Дата события"] >= a_core) & (g["Дата события"] <= b_core)]
+        # оставляем события в ядре, но для дедупа и логики используем их метки
+        sec = g[(g["Дата события"] >= a_core) & (g["Дата события"] <= b_core)].copy()
+        sec["lab"] = sec["dest_n"].apply(
+            lambda s: "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
+        )
+        sec = sec.dropna(subset=["lab"]).reset_index(drop=True)
 
-        labels = []
-        times = []
-        for _, r in g.iterrows():
-            s = r["dest_n"]
-            lab = "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
-            if lab is None:
-                continue
+        # дедуп дрожания
+        labels, times = [], []
+        for _, r in sec.iterrows():
+            lab = r["lab"]
             t = r["Дата события"]
-
-            # дедуп дрожания
             if labels:
-                t_prev = times[-1]
-                lab_prev = labels[-1]
-                if (
-                    lab == lab_prev
-                    and (t - t_prev).total_seconds() / 60.0 <= DEDUP_WINDOW_MIN
-                ):
+                t_prev, lab_prev = times[-1], labels[-1]
+                if lab == lab_prev and (t - t_prev).total_seconds() / 60.0 <= DEDUP_WINDOW_MIN:
                     continue
-
             labels.append(lab)
             times.append(t)
 
+        # --- СЧЁТ ВЫХОДОВ (как количество периодов "out" >= 5 минут) ---
         exits = 0
+        cur_out_start = None
 
-        # считаем выходами только интервалы "out" достаточной длины
-        for i, lab in enumerate(labels):
-            if lab != "out":
-                continue
+        # если на 09:00 уже "снаружи" — период out начался раньше, считаем от 09:00
+        if not inside:
+            cur_out_start = a_core
 
-            t_out = times[i]
-
-            # ищем ближайший последующий "in"
-            t_in = None
-            for j in range(i + 1, len(labels)):
-                if labels[j] == "in":
-                    t_in = times[j]
-                    break
-
-            # конец выхода — либо следующее "in", либо конец ядра
-            if t_in is not None:
-                t_end = min(t_in, b_core)
+        for t, lab in zip(times, labels):
+            if inside:
+                if lab == "out":
+                    inside = False
+                    cur_out_start = t
             else:
-                t_end = b_core
+                # сейчас снаружи
+                if lab == "in":
+                    # закрываем период out
+                    if cur_out_start is not None:
+                        dur = (t - cur_out_start).total_seconds() / 60.0
+                        if dur >= EXIT_MIN_DURATION:
+                            exits += 1
+                    inside = True
+                    cur_out_start = None
+                # lab == "out" -> продолжаем быть снаружи
 
-            dur = (t_end - t_out).total_seconds() / 60.0
+        # если период out тянется до конца ядра
+        if not inside and cur_out_start is not None:
+            dur = (b_core - cur_out_start).total_seconds() / 60.0
             if dur >= EXIT_MIN_DURATION:
                 exits += 1
 
-        # suspect: два одинаковых подряд события с разрывом > DEDUP_WINDOW_MIN
+        # --- SUSPECT (как в Colab): два одинаковых подряд с gap > 60 минут ---
         suspect = False
         for i in range(1, len(labels)):
             if labels[i] == labels[i - 1]:
                 gap = (times[i] - times[i - 1]).total_seconds() / 60.0
-                if gap > DEDUP_WINDOW_MIN:
+                if gap > SUSPECT_GAP_MIN:
                     suspect = True
                     break
 
@@ -726,6 +763,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
