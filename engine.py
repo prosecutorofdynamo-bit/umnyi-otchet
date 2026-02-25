@@ -637,6 +637,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     # 1) читаем журнал
     df = read_journal(journal_file)
+    kadry_dates = None
 
     # 2) автоматически выбираем колонку для направлений ('Вход' или 'Выход')
     def _total_outside(col):
@@ -705,6 +706,38 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         final["Дата_dt"].dt.weekday, unit="D"
     )
 
+    # === 7.5) НЕПОЛНЫЙ ДЕНЬ (1 проход) ===
+    # считаем количество событий за рабочий день
+    events_cnt = (
+        df.groupby(["ФИО", "Рабочий_день"])
+          .size()
+          .reset_index(name="events_cnt")
+    )
+    events_cnt["Дата"] = pd.to_datetime(events_cnt["Рабочий_день"], errors="coerce").dt.date
+    events_cnt = events_cnt[["ФИО", "Дата", "events_cnt"]]
+    
+    final = final.merge(events_cnt, on=["ФИО", "Дата"], how="left")
+    final["events_cnt"] = pd.to_numeric(final["events_cnt"], errors="coerce").fillna(0).astype(int)
+    
+    bad = final["events_cnt"] == 1
+    final.loc[bad, "suspect"] = False
+    
+    # пометка вместо "опоздание"
+    final.loc[bad, "Опоздание"] = "Неполный день (1 проход)"
+    
+    # чистим показатели (как в Colab)
+    final.loc[bad, "Вне_ядра_мин"] = 0
+    final.loc[bad, "Вне офиса"] = ""
+    final.loc[bad, "Выходы"] = 0
+    final.loc[bad, "Отсутствие более 2 часов подряд"] = ""
+    
+    final.loc[bad, "Итого_дня_мин"] = 0
+    final.loc[bad, "Итого за день"] = ""
+    final.loc[bad, "Недоработки"] = ""
+    
+    # можно удалить служебную колонку если не нужна в Excel
+    # final = final.drop(columns=["events_cnt"], errors="ignore")
+
     final["Итого_нед_мин"] = 0
     final["Итого за неделю"] = ""
 
@@ -744,6 +777,54 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         final["Причина отсутствия"] = final["Тип"]
         final = final.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
 
+    # === 9.5) ДОБАВЛЯЕМ ПУСТЫЕ ДНИ ПН–ПТ (как табель) ===
+    # определяем "неделю отчёта" по журналу (макс. рабочий день)
+    anchor = pd.to_datetime(df["Рабочий_день"], errors="coerce").max()
+    
+    if pd.isna(anchor):
+        days_present = []
+    else:
+        mo = anchor.normalize() - pd.to_timedelta(anchor.weekday(), unit="D")  # понедельник
+        days_present = [ (mo + pd.to_timedelta(i, "D")).date() for i in range(5) ]  # Пн–Пт
+    
+    all_fio = set(df["ФИО"].dropna().tolist())
+    if kadry_dates is not None and not kadry_dates.empty:
+        all_fio |= set(kadry_dates["ФИО"].dropna().tolist())
+    
+    # убираем дубли по ключу (ё/е, пробелы)
+    fio_pretty = {}
+    for fio in all_fio:
+        fio_pretty[fio_match_key(fio)] = fio  # оставляем последнее/или первое — не критично
+    all_fio = sorted(fio_pretty.values())
+    
+    # база (ФИО × дни)
+    base = pd.DataFrame([(fio, d) for fio in all_fio for d in days_present], columns=["ФИО", "Дата"])
+    
+    # IMPORTANT: final["Дата"] у тебя сейчас date, поэтому base тоже date
+    base["Дата"] = pd.to_datetime(base["Дата"], errors="coerce").dt.date
+    
+    # расширяем final до полного набора
+    final = base.merge(final, on=["ФИО", "Дата"], how="left")
+    
+    # аккуратные дефолты для пустых строк
+    text_cols = [
+        "Время прихода", "Время ухода", "Опоздание", "Общее время",
+        "Вне офиса", "Отсутствие более 2 часов подряд",
+        "Итого за день", "Итого за неделю", "Недоработки",
+        "Причина отсутствия",
+    ]
+    for c in text_cols:
+        if c in final.columns:
+            final[c] = final[c].fillna("")
+            
+    # если нет проходов (Продолжительность_мин == 0) — "Итого за день" оставляем пустым
+    if "Продолжительность_мин" in final.columns and "Итого за день" in final.columns:
+        final.loc[final["Продолжительность_мин"] <= 0, "Итого за день"] = ""
+    
+    num_cols = ["Вне_ядра_мин", "Итого_дня_мин", "Итого_нед_мин", "Выходы", "Продолжительность_мин"]
+    for c in num_cols:
+        if c in final.columns:
+            final[c] = pd.to_numeric(final[c], errors="coerce").fillna(0).astype(int)
     # === 10) Формат даты и порядок колонок ===
     final["Дата"] = pd.to_datetime(final["Дата"], errors="coerce").dt.strftime("%d-%m-%Y")
 
