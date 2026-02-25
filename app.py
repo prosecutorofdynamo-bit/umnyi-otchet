@@ -167,6 +167,11 @@ def consume_client_run(client_id: str, max_free_runs: int = 1) -> int:
 
     return free_left
 
+# ---------- ADMIN BYPASS (для тестов) ----------
+def is_admin_email(email: str) -> bool:
+    admins = st.secrets.get("ADMIN_EMAILS", [])
+    e = (email or "").strip().lower()
+    return e in [a.strip().lower() for a in admins]
 
 # ---------------- НАСТРОЙКИ СТРАНИЦЫ ----------------
 st.set_page_config(
@@ -654,8 +659,11 @@ if (
 
 # Флаг: текущий e-mail подтверждён?
 verified = (
-    st.session_state.get("email_verified", False)
-    and st.session_state.get("verification_email") == clean_client_id
+    is_admin_email(clean_client_id)
+    or (
+        st.session_state.get("email_verified", False)
+        and st.session_state.get("verification_email") == clean_client_id
+    )
 )
 
 # ---------- КНОПКА «ОБРАБОТАТЬ ДАННЫЕ» ----------
@@ -669,69 +677,73 @@ if st.button("🚀 Обработать данные"):
     elif not verified:
         warn_box("Сначала подтвердите e-mail через код из письма.")
     else:
-        # 1) проверяем лимит
-        try:
-            free_left_before = get_client_free_runs(clean_client_id)
-        except Exception as e:
-            st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
-            st.code(repr(e))
-        else:
-            if free_left_before <= 0:
-                st.markdown(
-                    """
-                    <div style="
-                        background-color: #ffffff; 
-                        border-left: 6px solid #E53935; 
-                        border: 1px solid #e0e0e0; 
-                        padding: 15px 18px; 
-                        border-radius: 6px;
-                        color: #b71c1c;
-                        font-size: 16px;
-                    ">
-                        <b>⛔ Бесплатный лимит использован.</b><br>
-                        Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.stop()
-
-            # 2) пробуем собрать отчёт
+        # 1) проверяем лимит (для админа лимит не действует)
+        if not is_admin_email(clean_client_id):
             try:
-                final_df = build_report(file_journal, kadry_file)
+                free_left_before = get_client_free_runs(clean_client_id)
             except Exception as e:
-                final_df = None
-                msg = str(e)
-
-                if "Не удалось прочитать журнал" in msg:
-                    st.error(
-                        "❌ Не удалось прочитать файл журнала. "
-                        "Проверьте, что в нём есть колонки: "
-                        "«Событие», «Дата события», «Фамилия», «Имя», "
-                        "«Отчество», «Вход», «Выход»."
-                    )
-                else:
-                    st.error(
-                        "❌ Ошибка при обработке данных. "
-                        "Проверьте формат файлов и попробуйте ещё раз."
-                    )
-
-                st.code(msg)
+                st.error("❌ Не удалось проверить бесплатный запуск. Попробуйте чуть позже.")
+                st.code(repr(e))
+                st.stop()
             else:
-                # 4) только после УСПЕШНОГО отчёта списываем запуск
+                if free_left_before <= 0:
+                    st.markdown(
+                        """
+                        <div style="
+                            background-color: #ffffff; 
+                            border-left: 6px solid #E53935; 
+                            border: 1px solid #e0e0e0; 
+                            padding: 15px 18px; 
+                            border-radius: 6px;
+                            color: #b71c1c;
+                            font-size: 16px;
+                        ">
+                            <b>⛔ Бесплатный лимит использован.</b><br>
+                            Чтобы получить дополнительный доступ — напишите нам, чтобы подключить расширенный режим.
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.stop()
+
+        # 2) пробуем собрать отчёт (ДОЛЖНО выполняться и для админа)
+        try:
+            final_df = build_report(file_journal, kadry_file)
+        except Exception as e:
+            final_df = None
+            msg = str(e)
+
+            if "Не удалось прочитать журнал" in msg:
+                st.error(
+                    "❌ Не удалось прочитать файл журнала. "
+                    "Проверьте, что в нём есть колонки: "
+                    "«Событие», «Дата события», «Фамилия», «Имя», "
+                    "«Отчество», «Вход», «Выход»."
+                )
+            else:
+                st.error(
+                    "❌ Ошибка при обработке данных. "
+                    "Проверьте формат файлов и попробуйте ещё раз."
+                )
+
+            st.code(msg)
+
+        else:
+            # 3) списываем запуск только НЕ админу
+            free_left_after = None
+            if not is_admin_email(clean_client_id):
                 try:
                     free_left_after = consume_client_run(clean_client_id)
                 except Exception as e:
-                    free_left_after = None
                     st.error("⚠ Отчёт сформирован, но не удалось обновить счётчик запусков.")
                     st.code(repr(e))
 
-                st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
-                if free_left_after is not None:
-                    if free_left_after > 0:
-                        st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
-                    else:
-                        st.info("Бесплатных запусков по этому e-mail больше не осталось.")
+            st.success("✅ Отчёт готов! Ниже можно скачать файл Excel.")
+            if free_left_after is not None:
+                if free_left_after > 0:
+                    st.info(f"Осталось бесплатных запусков по этому e-mail: {free_left_after}.")
+                else:
+                    st.info("Бесплатных запусков по этому e-mail больше не осталось.")
 
 # если ещё не нажали кнопку или была ошибка — дальше не идём
 if final_df is None:
@@ -863,6 +875,7 @@ st.download_button(
     file_name="умный_табель.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
 
 
 
