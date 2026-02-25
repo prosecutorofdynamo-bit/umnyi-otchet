@@ -142,6 +142,7 @@ NONPERSON_TOKENS = [
     "инженер без",
     "без фио",
     "безфио",
+    "милти",
     "аэростар",
     "aerostar",
     "техносервис",
@@ -724,11 +725,15 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     
     # пометка вместо "опоздание"
     final.loc[bad, "Опоздание"] = "Неполный день (1 проход)"
+
+    # очищаем "Общее время" и длительность (как в Colab, чтобы не было 0ч 0мин)
+    final.loc[bad, "Общее время"] = ""
+    final.loc[bad, "Продолжительность_мин"] = 0
     
     # чистим показатели (как в Colab)
     final.loc[bad, "Вне_ядра_мин"] = 0
     final.loc[bad, "Вне офиса"] = ""
-    final.loc[bad, "Выходы"] = 0
+    final.loc[bad, "Выходы"] = ""
     final.loc[bad, "Отсутствие более 2 часов подряд"] = ""
     
     final.loc[bad, "Итого_дня_мин"] = 0
@@ -816,15 +821,26 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     for c in text_cols:
         if c in final.columns:
             final[c] = final[c].fillna("")
-            
-    # если нет проходов (Продолжительность_мин == 0) — "Итого за день" оставляем пустым
-    if "Продолжительность_мин" in final.columns and "Итого за день" in final.columns:
-        final.loc[final["Продолжительность_мин"] <= 0, "Итого за день"] = ""
-    
+           
     num_cols = ["Вне_ядра_мин", "Итого_дня_мин", "Итого_нед_мин", "Выходы", "Продолжительность_мин"]
     for c in num_cols:
         if c in final.columns:
             final[c] = pd.to_numeric(final[c], errors="coerce").fillna(0).astype(int)
+
+    # пустые дни (нет проходов) — чистим отображаемые поля
+    mask_empty = final["Продолжительность_мин"] <= 0
+    
+    final.loc[mask_empty, "Время прихода"] = ""
+    final.loc[mask_empty, "Время ухода"] = ""
+    final.loc[mask_empty, "Общее время"] = ""
+    final.loc[mask_empty, "Вне офиса"] = ""
+    final.loc[mask_empty, "Отсутствие более 2 часов подряд"] = ""
+    final.loc[mask_empty, "Выходы"] = ""
+    final.loc[mask_empty, "Итого за день"] = ""
+    final.loc[mask_empty, "Недоработки"] = ""
+    # "Опоздание" тоже пустим, если это не неполный день (а просто нет проходов)
+    final.loc[mask_empty & (final.get("Опоздание", "") != "Неполный день (1 проход)"), "Опоздание"] = ""
+
     # === 10) Формат даты и порядок колонок ===
     final["Дата"] = pd.to_datetime(final["Дата"], errors="coerce").dt.strftime("%d-%m-%Y")
 
@@ -853,6 +869,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
