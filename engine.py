@@ -500,8 +500,8 @@ def _calc_group_stats(df: pd.DataFrame):
     rows = []
     for (fio, day), grp in df.groupby(["ФИО", "Рабочий_день"], sort=False):
         grp = grp.sort_values("Дата события")
-        first_ts = grp["Дата события"].iloc[0]
-        last_ts = grp[grp["Выход"].str.contains("Шлюз", na=False)]["Дата события"].max()
+        first_ts = grp["Дата события"].min()
+        last_ts  = grp["Дата события"].max()
         dur_min = int(
             (last_ts - first_ts).total_seconds() / 60.0
         ) if pd.notna(last_ts) and pd.notna(first_ts) else 0
@@ -656,6 +656,10 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     # 5) выходы и suspect
     exits_df = _calc_exits_and_suspect(df, right_col)
 
+    out_df["Дата"] = pd.to_datetime(out_df["Дата"], errors="coerce").dt.date
+    stats_df["Дата"] = pd.to_datetime(stats_df["Дата"], errors="coerce").dt.date
+    exits_df["Дата"] = pd.to_datetime(exits_df["Дата"], errors="coerce").dt.date
+
     # 6) объединяем
     final = out_df.merge(
         stats_df[["ФИО", "Дата", "Продолжительность_мин", "Общее время", "Опоздание"]],
@@ -768,6 +772,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
