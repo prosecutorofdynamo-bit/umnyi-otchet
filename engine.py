@@ -52,8 +52,8 @@ def smart_parse_date(x):
 
 
 # === Константы ===
-OUTSIDE = "шлюз"
-INSIDE_HINT = "офис"
+OUTSIDE_HINTS = ["шлюз", "турникет", "выход"]
+INSIDE_HINTS = ["офис", "кабинет", "зона", "office"]
 DEDUP_WINDOW_MIN = 3        # слипание дублей (минуты)
 CORE_START_H, CORE_START_M = 9, 0
 CORE_END_H,   CORE_END_M   = 18, 0
@@ -354,7 +354,7 @@ def inside_minutes_between(
     start_look = a - pd.Timedelta(hours=6)
     sec = g[(g["Дата события"] >= start_look) & (g["Дата события"] <= b)].copy()
     sec["label"] = sec["dest_n"].apply(
-        lambda s: "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
+        lambda s: "in" if any(h in s for h in INSIDE_HINTS) else ("out" if any(h in s for h in OUTSIDE_HINTS) else None)
     )
     sec = sec.dropna(subset=["label"]).reset_index(drop=True)
 
@@ -960,6 +960,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
