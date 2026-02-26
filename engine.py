@@ -247,7 +247,14 @@ def read_kadry(file_obj) -> pd.DataFrame:
     Читаем кадровый файл и разворачиваем интервалы в посуточный список.
     Ожидаем колонки: 'Сотрудник', 'Вид отсутствия', 'с', 'до'.
     """
-    kadry = pd.read_excel(file_obj, header=None)
+    # .xls требует xlrd
+    name = getattr(file_obj, "name", "")
+    ext = str(name).lower().rsplit(".", 1)[-1] if "." in str(name) else ""
+    
+    if ext == "xls":
+        kadry = pd.read_excel(file_obj, header=None, engine="xlrd")
+    else:
+        kadry = pd.read_excel(file_obj, header=None)
 
     # ищем строку, где в любой колонке есть 'Сотрудник'
     def _is_sotr_cell(x):
@@ -869,6 +876,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
