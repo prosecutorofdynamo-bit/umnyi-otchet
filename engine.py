@@ -702,13 +702,31 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         kadry_dates = read_kadry(kadry_file)
 
     # 2) автоматически выбираем колонку для направлений ('Вход' или 'Выход')
-    def _total_outside(col):
-        t = compute_outside_table(df, col)
-        return pd.to_numeric(t["Вне_ядра_мин"], errors="coerce").fillna(0).sum()
-
-    sum_exit = _total_outside("Выход")
-    sum_entry = _total_outside("Вход")
-    right_col = "Вход" if sum_entry <= sum_exit else "Выход"
+    # Выбираем по "качеству" меток: где больше распознано офис/шлюз.
+    
+    def _score_col(col: str):
+        s = df[col].map(norm)
+        good = s.apply(lambda x: (INSIDE_HINT in x) or (OUTSIDE in x)).sum()  # всего "понятных"
+        office = s.apply(lambda x: (INSIDE_HINT in x)).sum()                  # из них "офис"
+        return int(good), int(office)
+    
+    score_in = _score_col("Вход")
+    score_out = _score_col("Выход")
+    
+    # основное правило
+    right_col = "Вход" if score_in >= score_out else "Выход"
+    
+    # --- страховка, если меток слишком мало (СКУД пишет иначе) ---
+    MIN_GOOD = 50  # можешь поставить 20/100 под свои объёмы
+    if max(score_in[0], score_out[0]) < MIN_GOOD:
+        # fallback на старую логику (как было)
+        def _total_outside(col):
+            t = compute_outside_table(df, col)
+            return pd.to_numeric(t["Вне_ядра_мин"], errors="coerce").fillna(0).sum()
+    
+        sum_exit = _total_outside("Выход")
+        sum_entry = _total_outside("Вход")
+        right_col = "Вход" if sum_entry <= sum_exit else "Выход"
 
     # 3) таблица "Вне офиса"
     out_df = compute_outside_table(df, right_col)
@@ -942,6 +960,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
