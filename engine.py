@@ -225,7 +225,7 @@ def read_journal(file_obj) -> pd.DataFrame:
 
     # умный разбор даты
     df["Дата события"] = df["Дата события"].apply(smart_parse_date)
-    df = df.dropna(subset=["Дата события"]).sort_values("Дата события")
+    df = df.dropna(subset=["Дата события"])
     df["Рабочий_день"] = df["Дата события"].apply(work_day)
 
     df["Вход_n"] = df["Вход"].apply(norm)
@@ -238,6 +238,9 @@ def read_journal(file_obj) -> pd.DataFrame:
 
     df = df[~df["ФИО"].apply(is_nonperson)].copy()
 
+    # ✅ 2) ОДНА сортировка на весь пайплайн (ускоряет)
+    df = df.sort_values(["ФИО", "Рабочий_день", "Дата события"]).reset_index(drop=True)
+    
     return df
 
 # ===================== ЧТЕНИЕ КАДРОВОГО ФАЙЛА =====================
@@ -314,11 +317,20 @@ def read_kadry(file_obj) -> pd.DataFrame:
 
     kadry_dates = pd.DataFrame(rows)
 
+    if kadry_dates.empty:
+        return kadry_dates
+
+    # ✅ 3) Чистим пробелы/мусор, чтобы "Отпуск " == "Отпуск"
+    kadry_dates["Тип"] = kadry_dates["Тип"].astype(str).str.replace("\xa0", " ").str.strip()
+    
+    # (опционально) то же самое для ФИО — тоже полезно
+    kadry_dates["ФИО"] = kadry_dates["ФИО"].astype(str).str.replace("\xa0", " ").str.strip()
+    
     # замена «гос. обязанности» -> «Сдача крови»
     kadry_dates["Тип"] = kadry_dates["Тип"].replace(
         to_replace=r"(?i).*гос.*обязан.*", value="Сдача крови", regex=True
     )
-
+    
     return kadry_dates
 
 # === Время внутри офиса и длинный разрыв вне офиса ===
@@ -930,6 +942,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
