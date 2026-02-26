@@ -247,11 +247,13 @@ def read_kadry(file_obj) -> pd.DataFrame:
     Читаем кадровый файл и разворачиваем интервалы в посуточный список.
     Ожидаем колонки: 'Сотрудник', 'Вид отсутствия', 'с', 'до'.
     """
+    # обязательно в начало файла
     try:
         file_obj.seek(0)
     except Exception:
         pass
-    
+
+    # 1) пробуем .xls через xlrd, если не вышло — обычный read_excel (xlsx)
     try:
         kadry = pd.read_excel(file_obj, header=None, engine="xlrd")
     except Exception:
@@ -261,7 +263,7 @@ def read_kadry(file_obj) -> pd.DataFrame:
             pass
         kadry = pd.read_excel(file_obj, header=None)
 
-    # ищем строку, где в любой колонке есть 'Сотрудник'
+    # 2) ищем строку заголовков (где есть "Сотрудник")
     def _is_sotr_cell(x):
         s = "" if pd.isna(x) else str(x)
         return s.strip().casefold() == "сотрудник"
@@ -269,23 +271,31 @@ def read_kadry(file_obj) -> pd.DataFrame:
     mask_rows = kadry.apply(lambda row: row.map(_is_sotr_cell).any(), axis=1)
     idxs = kadry.index[mask_rows]
     if len(idxs) == 0:
-        raise RuntimeError(
-            "Не удалось найти строку с заголовком 'Сотрудник' в кадровом файле."
-        )
+        raise RuntimeError("Не удалось найти строку с заголовком 'Сотрудник' в кадровом файле.")
 
     hdr_row = idxs[0]
     kadry.columns = kadry.iloc[hdr_row]
-    kadry = kadry.iloc[hdr_row + 1 :]
+    kadry = kadry.iloc[hdr_row + 1 :].copy()
 
-    kadry = kadry.rename(
-        columns={
-            "Сотрудник": "ФИО",
-            "Вид отсутствия": "Тип",
-            "с": "Дата_с",
-            "до": "Дата_по",
-        }
-    )
-    kadry = kadry[["ФИО", "Тип", "Дата_с", "Дата_по"]].copy()
+    # 3) чистим имена колонок (иногда там пробелы/неразрывные)
+    kadry.columns = [
+        ("" if pd.isna(c) else str(c)).strip()
+        for c in kadry.columns
+    ]
+
+    kadry = kadry.rename(columns={
+        "Сотрудник": "ФИО",
+        "Вид отсутствия": "Тип",
+        "с": "Дата_с",
+        "до": "Дата_по",
+    })
+
+    need_cols = ["ФИО", "Тип", "Дата_с", "Дата_по"]
+    for c in need_cols:
+        if c not in kadry.columns:
+            raise RuntimeError(f"В кадровом файле не найдена колонка '{c}'. Найдены: {list(kadry.columns)}")
+
+    kadry = kadry[need_cols].copy()
     kadry = kadry.dropna(subset=["ФИО", "Тип"], how="any")
 
     # умный разбор дат
@@ -310,7 +320,6 @@ def read_kadry(file_obj) -> pd.DataFrame:
     )
 
     return kadry_dates
-
 
 # === Время внутри офиса и длинный разрыв вне офиса ===
 
@@ -640,7 +649,32 @@ def fio_match_key(s):
     s = re.sub(r"\s+", " ", s)                  # множественные пробелы → один
     return s.strip().lower()                    # обрезаем края, в нижний регистр
 
+def fio_short_key(s: str) -> str:
+    """
+    Фамилия + инициалы: "Иванов И.И." -> "иванов_ии"
+    "Иванов Иван Иванович" -> "иванов_ии"
+    """
+    s = "" if pd.isna(s) else str(s)
+    s = unicodedata.normalize("NFKC", s)
+    s = s.replace("ё", "е").replace("Ё", "Е")
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    if not s:
+        return ""
 
+    # уберём точки, чтобы "и.и." и "ии" совпадали
+    s = s.replace(".", " ")
+    parts = [p for p in s.split() if p]
+    if not parts:
+        return ""
+
+    fam = parts[0]
+    ini = ""
+    if len(parts) >= 2 and parts[1]:
+        ini += parts[1][0]
+    if len(parts) >= 3 and parts[2]:
+        ini += parts[2][0]
+
+    return f"{fam}_{ini}"
 # ===================== ГЛАВНАЯ ФУНКЦИЯ ОТЧЁТА =====================
 
 def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
@@ -774,25 +808,40 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         final["Причина отсутствия"] = ""
     else:
         kadry_dates = read_kadry(kadry_file)
-
-        # ключи ФИО + даты через fio_match_key
-        final["ФИО_key"] = final["ФИО"].apply(fio_match_key)
-        kadry_dates["ФИО_key"] = kadry_dates["ФИО"].apply(fio_match_key)
-
-        final["Дата_key"] = pd.to_datetime(
-            final["Дата"], errors="coerce"
-        ).dt.date
-        kadry_dates["Дата_key"] = pd.to_datetime(
-            kadry_dates["Дата"], errors="coerce"
-        ).dt.date
-
+      
+        # ключи
+        final["Дата_key"] = pd.to_datetime(final["Дата"], errors="coerce").dt.date
+        kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
+        
+        final["ФИО_key_full"] = final["ФИО"].apply(fio_match_key)
+        kadry_dates["ФИО_key_full"] = kadry_dates["ФИО"].apply(fio_match_key)
+        
+        final["ФИО_key_short"] = final["ФИО"].apply(fio_short_key)
+        kadry_dates["ФИО_key_short"] = kadry_dates["ФИО"].apply(fio_short_key)
+        
+        # 1) пробуем точное совпадение ФИО
+        m1 = kadry_dates[["ФИО_key_full", "Дата_key", "Тип"]].drop_duplicates()
         final = final.merge(
-            kadry_dates[["ФИО_key", "Дата_key", "Тип"]],
-            on=["ФИО_key", "Дата_key"],
+            m1,
+            left_on=["ФИО_key_full", "Дата_key"],
+            right_on=["ФИО_key_full", "Дата_key"],
             how="left",
         )
-        final["Причина отсутствия"] = final["Тип"]
-        final = final.drop(columns=["Тип", "ФИО_key", "Дата_key"], errors="ignore")
+        
+        # 2) где не нашли — пробуем фамилия+инициалы
+        need2 = final["Тип"].isna()
+        if need2.any():
+            m2 = kadry_dates[["ФИО_key_short", "Дата_key", "Тип"]].drop_duplicates()
+            tmp = final.loc[need2, ["ФИО_key_short", "Дата_key"]].merge(
+                m2, on=["ФИО_key_short", "Дата_key"], how="left"
+            )
+            final.loc[need2, "Тип"] = tmp["Тип"].values
+        
+        final["Причина отсутствия"] = final["Тип"].fillna("")
+        final = final.drop(
+            columns=["Тип", "ФИО_key_full", "ФИО_key_short", "Дата_key"],
+            errors="ignore",
+        )
 
     # === 9.5) ДОБАВЛЯЕМ ПУСТЫЕ ДНИ ПН–ПТ (как табель) ===
     # определяем "неделю отчёта" по журналу (макс. рабочий день)
@@ -805,8 +854,14 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         days_present = [ (mo + pd.to_timedelta(i, "D")).date() for i in range(5) ]  # Пн–Пт
     
     all_fio = set(df["ФИО"].dropna().tolist())
-    if kadry_dates is not None and not kadry_dates.empty:
-        all_fio |= set(kadry_dates["ФИО"].dropna().tolist())
+
+    # добавляем из кадров ТОЛЬКО тех, кто отсутствует в пределах этой недели (Пн–Пт)
+    if kadry_dates is not None and not kadry_dates.empty and len(days_present) > 0:
+        kd_week = kadry_dates[kadry_dates["Дата"].isin(days_present)]
+        all_fio |= set(kd_week["ФИО"].dropna().tolist())
+
+    # и выкинем совсем пустые ФИО
+    all_fio = {fio for fio in all_fio if fio_match_key(fio)}
     
     # убираем дубли по ключу (ё/е, пробелы)
     fio_pretty = {}
@@ -881,6 +936,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
