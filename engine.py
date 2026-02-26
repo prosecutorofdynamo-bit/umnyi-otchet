@@ -684,7 +684,10 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     """
     # 1) читаем журнал
     df = read_journal(journal_file)
+
     kadry_dates = None
+    if kadry_file is not None:
+        kadry_dates = read_kadry(kadry_file)
 
     # 2) автоматически выбираем колонку для направлений ('Вход' или 'Выход')
     def _total_outside(col):
@@ -802,47 +805,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
         final.loc[last_idx, "Итого за неделю"] = fmt_hm(week_sum)
 
     final = final.drop(columns=["Дата_dt", "week_monday", "suspect"], errors="ignore")
-
-    # === 9) ПРИЧИНА ОТСУТСТВИЯ (кадровый файл) ===
-    if kadry_file is None:
-        final["Причина отсутствия"] = ""
-    else:
-        kadry_dates = read_kadry(kadry_file)
-      
-        # ключи
-        final["Дата_key"] = pd.to_datetime(final["Дата"], errors="coerce").dt.date
-        kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
-        
-        final["ФИО_key_full"] = final["ФИО"].apply(fio_match_key)
-        kadry_dates["ФИО_key_full"] = kadry_dates["ФИО"].apply(fio_match_key)
-        
-        final["ФИО_key_short"] = final["ФИО"].apply(fio_short_key)
-        kadry_dates["ФИО_key_short"] = kadry_dates["ФИО"].apply(fio_short_key)
-        
-        # 1) пробуем точное совпадение ФИО
-        m1 = kadry_dates[["ФИО_key_full", "Дата_key", "Тип"]].drop_duplicates()
-        final = final.merge(
-            m1,
-            left_on=["ФИО_key_full", "Дата_key"],
-            right_on=["ФИО_key_full", "Дата_key"],
-            how="left",
-        )
-        
-        # 2) где не нашли — пробуем фамилия+инициалы
-        need2 = final["Тип"].isna()
-        if need2.any():
-            m2 = kadry_dates[["ФИО_key_short", "Дата_key", "Тип"]].drop_duplicates()
-            tmp = final.loc[need2, ["ФИО_key_short", "Дата_key"]].merge(
-                m2, on=["ФИО_key_short", "Дата_key"], how="left"
-            )
-            final.loc[need2, "Тип"] = tmp["Тип"].values
-        
-        final["Причина отсутствия"] = final["Тип"].fillna("")
-        final = final.drop(
-            columns=["Тип", "ФИО_key_full", "ФИО_key_short", "Дата_key"],
-            errors="ignore",
-        )
-
+    
     # === 9.5) ДОБАВЛЯЕМ ПУСТЫЕ ДНИ ПН–ПТ (как табель) ===
     # определяем "неделю отчёта" по журналу (макс. рабочий день)
     anchor = pd.to_datetime(df["Рабочий_день"], errors="coerce").max()
@@ -877,6 +840,37 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     
     # расширяем final до полного набора
     final = base.merge(final, on=["ФИО", "Дата"], how="left")
+
+    # === 9) ПРИЧИНА ОТСУТСТВИЯ (кадровый файл) — ПОСЛЕ 9.5 ===
+    if kadry_file is None or kadry_dates is None or kadry_dates.empty:
+        final["Причина отсутствия"] = ""
+    else:
+        final["Дата_key"] = pd.to_datetime(final["Дата"], errors="coerce").dt.date
+        kadry_dates["Дата_key"] = pd.to_datetime(kadry_dates["Дата"], errors="coerce").dt.date
+
+        final["ФИО_key_full"] = final["ФИО"].apply(fio_match_key)
+        kadry_dates["ФИО_key_full"] = kadry_dates["ФИО"].apply(fio_match_key)
+
+        final["ФИО_key_short"] = final["ФИО"].apply(fio_short_key)
+        kadry_dates["ФИО_key_short"] = kadry_dates["ФИО"].apply(fio_short_key)
+
+        m1 = kadry_dates[["ФИО_key_full", "Дата_key", "Тип"]].drop_duplicates()
+        final = final.merge(m1, on=["ФИО_key_full", "Дата_key"], how="left")
+
+        need2 = final["Тип"].isna()
+        if need2.any():
+            m2 = kadry_dates[["ФИО_key_short", "Дата_key", "Тип"]].drop_duplicates()
+            tmp = final.loc[need2, ["ФИО_key_short", "Дата_key"]].merge(
+                m2, on=["ФИО_key_short", "Дата_key"], how="left"
+            )
+            final.loc[need2, "Тип"] = tmp["Тип"].values
+
+        final["Причина отсутствия"] = final["Тип"].fillna("")
+
+        final = final.drop(
+            columns=["Тип", "ФИО_key_full", "ФИО_key_short", "Дата_key"],
+            errors="ignore",
+        )
     
     # аккуратные дефолты для пустых строк
     text_cols = [
@@ -936,6 +930,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
