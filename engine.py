@@ -104,7 +104,7 @@ def last_known_dest_before(g: pd.DataFrame, right_col: str, ts: pd.Timestamp, lo
         return ""
     h["dest_n"] = h[right_col].map(norm)
     # оставляем только понятные метки (офис/шлюз)
-    h = h[h["dest_n"].apply(lambda s: (INSIDE_HINT in s) or (OUTSIDE in s))]
+    h = h[h["dest_n"].apply(lambda s: any(x in s for x in INSIDE_HINTS) or any(x in s for x in OUTSIDE_HINTS))]
     if h.empty:
         return ""
     return str(h.iloc[-1]["dest_n"])
@@ -128,7 +128,7 @@ def init_inside_at(a: pd.Timestamp, grp: pd.DataFrame, right_col: str) -> bool:
     if not last_dest:
         return False  # нет данных -> снаружи
 
-    return not (OUTSIDE in last_dest)
+    return not any(x in last_dest for x in OUTSIDE_HINTS)
 
 # --- Фильтрация «не людей» (карты, клининг и т.п.) ---
 NONPERSON_TOKENS = [
@@ -407,7 +407,7 @@ def longest_outside_gap_between(
     start_look = a - pd.Timedelta(hours=6)
     sec = g[(g["Дата события"] >= start_look) & (g["Дата события"] <= b)].copy()
     sec["label"] = sec["dest_n"].apply(
-        lambda s: "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
+        lambda s: "in" if any(x in s for x in INSIDE_HINTS) else ("out" if any(x in s for x in OUTSIDE_HINTS) else None)
     )
     sec = sec.dropna(subset=["label"]).reset_index(drop=True)
 
@@ -586,7 +586,7 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
         # оставляем события в ядре, но для дедупа и логики используем их метки
         sec = g[(g["Дата события"] >= a_core) & (g["Дата события"] <= b_core)].copy()
         sec["lab"] = sec["dest_n"].apply(
-            lambda s: "in" if INSIDE_HINT in s else ("out" if OUTSIDE in s else None)
+            lambda s: "in" if any(x in s for x in INSIDE_HINTS) else ("out" if any(x in s for x in OUTSIDE_HINTS) else None)
         )
         sec = sec.dropna(subset=["lab"]).reset_index(drop=True)
 
@@ -595,10 +595,15 @@ def _calc_exits_and_suspect(df: pd.DataFrame, right_col: str):
         for _, r in sec.iterrows():
             lab = r["lab"]
             t = r["Дата события"]
+        
             if labels:
                 t_prev, lab_prev = times[-1], labels[-1]
-                if lab == lab_prev and (t - t_prev).total_seconds() / 60.0 <= DEDUP_WINDOW_MIN:
+                gap = (t - t_prev).total_seconds() / 60.0
+        
+                # защита от дублей турникета
+                if lab == lab_prev and gap <= DEDUP_WINDOW_MIN:
                     continue
+        
             labels.append(lab)
             times.append(t)
 
@@ -706,8 +711,8 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     
     def _score_col(col: str):
         s = df[col].map(norm)
-        good = s.apply(lambda x: (INSIDE_HINT in x) or (OUTSIDE in x)).sum()  # всего "понятных"
-        office = s.apply(lambda x: (INSIDE_HINT in x)).sum()                  # из них "офис"
+        good = s.apply(lambda x: any(t in x for t in INSIDE_HINTS) or any(t in x for t in OUTSIDE_HINTS)).sum()
+        office = s.apply(lambda x: any(t in x for t in INSIDE_HINTS)).sum()
         return int(good), int(office)
     
     score_in = _score_col("Вход")
@@ -960,6 +965,7 @@ def build_report(journal_file, kadry_file=None) -> pd.DataFrame:
     final = final[cols_order]
 
     return final
+
 
 
 
